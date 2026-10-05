@@ -1,0 +1,199 @@
+# ──────────────────────────────────────────────
+# Planor — .gitignore
+# Monorepo pnpm + Turborepo | Expo (RN) + Fastify + Drizzle/Supabase
+# ──────────────────────────────────────────────
+
+# ===== Segredos e variáveis de ambiente =====
+# NUNCA commitar. Apenas .env.example é versionado (ver CONTEXTO.md §10).
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.env
+.envrc
+secrets/
+*.pem
+*.key
+*.p8
+*.p12
+*.mobileprovision
+*.keystore
+*.jks
+google-services.json
+GoogleService-Info.plist
+service-account*.json
+serviceAccountKey.json
+
+# ===== Dependências =====
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+.yarn/
+.yarn/cache
+.yarn/install-state.gz
+jspm_packages/
+web_modules/
+.npm
+.node_repl_history
+*.tgz
+
+# ===== Build e saída =====
+dist/
+build/
+out/
+lib/
+.output/
+.vercel/
+.netlify/
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# ===== Turborepo =====
+.turbo/
+.turbo-cookie
+
+# ===== Cache de ferramentas =====
+.cache/
+.eslintcache
+.stylelintcache
+.prettiercache
+.parcel-cache/
+.rollup.cache/
+.swc/
+.rspack-cache/
+.vite/
+.tsc-cache/
+
+# ===== Expo / React Native =====
+.expo/
+.expo-shared/
+expo-env.d.ts
+dist/
+web-build/
+.metro-health-check*
+metro-cache/
+# Diretórios nativos gerados por `expo prebuild` (CNG).
+# Se o projeto migrar para bare workflow, REMOVA estas 3 linhas e versione ios/ e android/.
+/apps/mobile/ios/
+/apps/mobile/android/
+*.jsbundle
+*.hprof
+
+# EAS Build
+.easignore
+eas-build-*.log
+credentials.json
+
+# ===== iOS (caso ios/ passe a ser versionado) =====
+*.xcuserstate
+xcuserdata/
+DerivedData/
+*.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+Pods/
+Podfile.lock
+*.ipa
+*.dSYM.zip
+*.dSYM
+.xcode.env.local
+
+# ===== Android (caso android/ passe a ser versionado) =====
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+local.properties
+.gradle/
+captures/
+.cxx/
+*.iml
+
+# ===== Banco de dados / Supabase / Drizzle =====
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+# Mantemos packages/db/drizzle (migrações são código e VÃO para o git).
+# Ignoramos apenas artefatos locais:
+drizzle/meta/_journal.json.bak
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+pgdata/
+docker-volumes/
+
+# ===== Testes e cobertura =====
+coverage/
+*.lcov
+.nyc_output/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+__snapshots__/*.snap.bak
+maestro-debug-output/
+
+# ===== Logs =====
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# ===== Observabilidade =====
+# Sentry: NÃO commitar token de upload de sourcemaps
+.sentryclirc
+sentry.properties
+.sentry-build-plugin/
+
+# ===== Arquivos de usuário / uploads locais =====
+# Imports de fatura (PDF/OFX) usados em teste local — contêm dados financeiros reais
+uploads/
+tmp/
+temp/
+*.ofx
+*.qfx
+fixtures/private/
+
+# ===== Editores e IDEs =====
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*~
+.history/
+*.sublime-workspace
+*.sublime-project
+
+# ===== Assistentes de IA =====
+# CLAUDE.md, AGENTS.md e .claude/settings.json SÃO versionados (regras do time).
+.claude/settings.local.json
+.claude/*.local.json
+.cursor/
+.aider*
+.continue/
+
+# ===== macOS =====
+.DS_Store
+.DS_Store?
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+
+# ===== Windows / Linux =====
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.directory
+.fuse_hidden*
+.nfs*
