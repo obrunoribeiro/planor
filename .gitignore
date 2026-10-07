@@ -38,10 +38,14 @@ web_modules/
 *.tgz
 
 # ===== Build e saída =====
+# "lib/" NÃO está aqui de propósito: nenhum pacote deste monorepo builda pra uma pasta "lib/"
+# (apps/api builda com `tsc --noEmit`), e um "lib/" sem âncora também casava com pastas de
+# código-fonte de verdade como apps/mobile/src/lib e apps/api/src/lib — eram 16 arquivos reais
+# (auth, cliente Supabase, stores) nunca commitados até este ponto. Se algum pacote futuro
+# builder pra "lib/", use um caminho âncorado (ex.: "/packages/nome-do-pacote/lib/").
 dist/
 build/
 out/
-lib/
 .output/
 .vercel/
 .netlify/
@@ -186,7 +190,10 @@ fixtures/private/
 ._*
 .Spotlight-V100
 .Trashes
-Icon?
+# "Icon?" (marcador de ícone de pasta customizado do Finder, arquivo "Icon\r") foi removido de
+# propósito: com core.ignorecase=true (padrão no macOS) ele também casava, sem âncora, com
+# qualquer pasta de 5 letras começando com "icon" — incluindo packages/ui/src/icons/ (os ícones
+# reais extraídos do Figma), que ficou invisível pro git por causa disso.
 
 # ===== Windows / Linux =====
 Thumbs.db
