@@ -41,6 +41,32 @@ Não é opcional e não vale "achar que já sabe de memória". O `CONTEXTO.md` �
 
 ---
 
+## ⛔ REGRA Nº 2 — ATUALIZE O PROGRESSO.md ANTES DE CADA COMMIT
+
+**Antes de qualquer commit que termine ou avance um pedaço de fase, atualize o
+[`PROGRESSO.md`](./PROGRESSO.md) na raiz — no mesmo commit, nunca depois.**
+
+O `CONTEXTO.md` diz o que o produto **deve ser**; o `PROGRESSO.md` diz **o que já existe de
+verdade**, o que falta de cada fase, e onde o código foi diferente do que o `CONTEXTO.md`
+descreve (e por quê). Como o repositório é compartilhado entre o Bruno e mais uma pessoa — cada
+um com sua própria sessão de IA —, esse arquivo é o que evita que as duas sessões redescubram (ou
+contradigam) o que a outra já decidiu.
+
+No `PROGRESSO.md`, atualize:
+1. **O que foi feito** nesta sessão/branch, na fase correspondente.
+2. **O que ainda falta** da fase em que você mexeu (reavalie a lista inteira da fase, não só
+   adicione uma linha).
+3. **Se o código fez algo diferente do `CONTEXTO.md` original** — valor que não dava pra calcular
+   de verdade, dado incompleto no seed, limitação técnica, pedido direto de alguém que mudou o
+   escopo — registre na seção "Decisões diferentes do CONTEXTO.md original", com o motivo. Isso
+   não é opcional: código que se desvia do `CONTEXTO.md` sem registrar o porquê é o tipo de coisa
+   que gera retrabalho quando a outra pessoa (ou IA) encontra o desvio sem contexto.
+
+Se a tarefa não mudou o estado de nenhuma fase (ex.: só configuração local, sem efeito no
+produto), não precisa mexer no `PROGRESSO.md`.
+
+---
+
 ## Princípios que nunca podem ser violados no código
 
 Resumo do que está na seção 1 do `CONTEXTO.md`. Qualquer PR que viole isso deve ser recusado:

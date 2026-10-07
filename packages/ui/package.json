@@ -1,0 +1,26 @@
+{
+  "name": "@planor/ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "expo-linear-gradient": "*",
+    "expo-router": "*",
+    "react": "*",
+    "react-native": "*",
+    "react-native-reanimated": "*",
+    "react-native-svg": "*"
+  },
+  "devDependencies": {
+    "@planor/config": "workspace:*",
+    "@types/react": "~19.2.2",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.3"
+  }
+}

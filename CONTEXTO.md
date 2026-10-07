@@ -125,28 +125,40 @@ planor/
 
 ## 4. Design system
 
-Os valores oficiais estão nas **variáveis do Figma** (coleções `Primitives` e `Color`, com modos `Dark` e `Light`). Exporte as variáveis e gere `src/theme/tokens.ts`. Os valores abaixo servem de referência rápida.
+**Fonte da verdade: o Figma.** Arquivo `xAWFDxaXDQsvyz6wiCAJnH` (https://www.figma.com/design/xAWFDxaXDQsvyz6wiCAJnH/Planor). Com o MCP do Figma conectado, leia as variáveis e os componentes direto de lá (`get_variable_defs`, `get_design_context` com o node id) em vez de confiar nos valores de referência abaixo.
 
-### Cores principais (modo Dark)
-| Token | Valor de referência | Uso |
+### Como gerar o tema
+Gere tudo em `packages/ui/src/theme/` (ou `src/theme/`), a partir das variáveis do Figma:
+- `colors.ts`: coleção `Color` (semântica, modos `Dark` e `Light`), que aponta para a coleção `Primitives`. No código, use **só os nomes semânticos** (`bg/surface` → `colors.bg.surface`). Nunca use um hex direto num componente.
+- `tokens.ts`: coleção `Tokens` (números, modo único `Valor`):
+  - `space/*`: 0, 2, 4, 6, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 60.
+  - `radius/*`: xs 6, sm 8, md 12, lg 14, xl 16, 2xl 20, 3xl 24, 4xl 28, sheet 32, screen 40, full 999.
+  - `size/*`: ícones, avatares 28/36/40/48/72 e caixas de ícone 36/40/44.
+  - `stroke/*`: default 1, strong 1.5, control 2.
+- `gradients.ts`: estilos de pintura `Gradiente/*`. Renderize com `expo-linear-gradient`.
+  - Lista: Botão, Marca profundo, Ícone, Progresso, Card destaque, Sucesso, Âmbar, Teal, Rosa, Azul, Progresso âmbar, Progresso teal.
+  - Também há `Brilho/Roxo`, um radial usado no topo das telas.
+- `shadows.ts`: estilos de efeito.
+  - `Sombra/Marca`, `Sombra/Marca forte`, `Sombra/Sucesso`, `Sombra/Âmbar`.
+  - `Brilho/Borda interna`.
+  - `Desfoque/Vidro`, que usa `expo-blur`.
+- `typography.ts`: estilos de texto (tabela abaixo). Carregue Manrope com `@expo-google-fonts/manrope`.
+
+### Cores de referência (modo Dark)
+| Token | Valor | Uso |
 |---|---|---|
 | `bg/default` | `#0B0A12` | Fundo das telas |
 | `bg/surface` | `#16151A` | Cards |
-| `bg/elevated` | neutro 800 (~`#232329`) | Bottom sheets e diálogos |
-| `border/default` | `#232329` | Bordas de card |
-| `border/strong` | `#3A3A40` | Bordas de controles |
-| `text/primary` | `#FFFFFF` | |
-| `text/secondary` | `#BDBDC5` | |
-| `text/tertiary` | `#9797A0` | |
-| `bg/brand` / roxo 500 | **`#7C5CFF`** | Cor principal |
-| Gradiente do botão | `#7457F5 → #4F34BE` (135°) | Botão primário |
-| Gradiente de destaque | `#9385FF → #6647E2 → #25176C` | Ícones e selos |
-| Lilás claro | `#C8C6FE` | Barras de progresso (início do gradiente) |
-| `text/success` | `#5AD7AA` (base `#22C997`) | |
-| `text/error` | base `#F0445A` | |
-| `text/alert` | base `#F5A524` / `#FFC46B` | |
+| `bg/elevated` | ~`#232329` | Sheets e diálogos |
+| `bg/control` · `bg/sunken` · `bg/glass` | — | Controles, áreas rebaixadas, vidro |
+| `overlay/scrim` | `#05040A` a 72% | Fundo atrás de sheets/diálogos |
+| `border/default` · `border/strong` · `border/brand` | `#232329` · `#3A3A40` · roxo | |
+| `text/primary` · `secondary` · `tertiary` | `#FFFFFF` · `#BDBDC5` · `#9797A0` | |
+| `bg/brand` (roxo 500) | **`#7C5CFF`** | Cor principal |
+| success / error / alert | `#22C997` · `#F0445A` · `#F5A524` | Bases; há `text/*`, `icon/*` e `bg/*-subtle` de cada |
+| Acentos | pink, green, amber, blue, teal (300 e 700) | Avatares, categorias, templates |
 
-Escala de roxo de 0 a 900, com 500 = `#7C5CFF`. Neutros vão de 0 a 1000, e há escalas de success, error e alert de 50 a 900. O **modo Light** já existe nas variáveis; o lançamento é só em dark.
+O **modo Light** já existe nas variáveis; o lançamento é só em dark, mas monte o tema já preparado para os dois.
 
 ### Tipografia: **Manrope**
 | Estilo | Tamanho/altura | Peso |
@@ -161,33 +173,44 @@ Escala de roxo de 0 a 900, com 500 = `#7C5CFF`. Neutros vão de 0 a 1000, e há 
 | Number XL / Large / Medium / Small | 36/44 · 24/32 · 16 · 14 | ExtraBold/Bold (algarismos tabulares) |
 
 ### Medidas
-- **Tela base:** 390 de largura.
-- **Margens:** 24 nas laterais e 60 no topo (área segura).
-- **Espaço entre blocos:** 20.
-- **Raios:**
-  - card: 24;
-  - input: 16;
-  - botão: pílula, 28 com altura 56;
-  - chip: 20 com altura 40;
-  - bottom sheet: 32 no topo.
-- **Brilho de fundo:** elipse com gradiente radial roxo (30% → 0%) no topo das telas.
+- Tela base 390 de largura; margens laterais 24; topo 60 (área segura); 20 entre blocos.
+- Card: raio 24. Input: 16. Botão: pílula com altura 56. Chip: altura 40. Sheet: 32 no topo.
 
-### Componentes do Figma (página `Componentes`)
-- **Botões:**
-  - `Botão/Primário` (texto);
-  - `Botão/Secundário` (texto, mais ícone opcional);
-  - `Botão/Ícone` (48×48, redondo).
-- **Navegação:**
-  - `Navegação/Header` (voltar, título e ação opcional);
-  - `Navegação/Tab Bar` (Início, Gastos, Futuro, IA);
-  - `Onboarding/Cabeçalho` (voltar, progresso de 5 passos e "Pular").
-- **Listas e cards:**
-  - `Card/Opção` (padrão ou selecionado);
-  - `Lista/Banco`;
-  - `Lista/Transação` (saída ou entrada);
-  - `Chip` (padrão ou ativo).
-- **Ícones:** `Ícone/*`, com traço de 1,8 em grade 24×24. Use os SVGs do Figma; não troque por outra biblioteca.
-- **Marca:** `Logo/Símbolo`, `Logo/Horizontal` e `App Icon`.
+### Componentes (página `Componentes`, quadro "Sistema · Componentes")
+Cada componente do Figma vira um componente React Native em `packages/ui` **com o mesmo nome e as mesmas props**. Variantes do Figma viram props de união (`tone: 'brand' | 'success' | ...`). Propriedades de texto e booleanas viram props comuns.
+
+| Grupo | Componente (Figma) | Variantes / props principais |
+|---|---|---|
+| Botões | `Botão/Primário` | Estado: Padrão, Desabilitado, Carregando · Texto |
+| | `Botão/Secundário` | Texto, Ícone (opcional) |
+| | `Botão/Ícone`, `Botão/Fechar` | 48×48 / 40×40 redondos |
+| | `Botão/Texto` | Tom: Marca, Neutro, Erro |
+| | `Botão/Destrutivo` | Texto |
+| Formulário | `Formulário/Input` | Estado: Padrão, Foco, Preenchido, Erro, Desabilitado · Rótulo, Valor, Ajuda, Ícone |
+| | `Formulário/Busca` | Estado: Padrão, Foco · Texto |
+| | `Formulário/Dígito do código` | Campo do OTP |
+| | `Controle/Toggle` · `Rádio` · `Checkbox` | Ligado / Selecionado / Marcado |
+| | `Controle/Segmentado` | Opções 2 ou 3 · Ativo · Item 1–3 |
+| | `Controle/Slider` | |
+| | `Chip` | Padrão, Ativo (largura automática) |
+| Exibição | `Avatar` | Tamanho 28/36/40/48/72 × Cor (Roxo, Rosa, Verde, Âmbar, Azul, Teal) · Iniciais |
+| | `Selo` | Tom: Marca, Sucesso, Alerta, Erro, Neutro, Pro |
+| | `Caixa de ícone` | Tamanho 36/40/44 × Estilo Sutil, Gradiente, Neutro · Ícone |
+| | `Progresso/Barra` | Tom × **Progresso 0–100**. No código, use `value: number` contínuo; as variantes de 10 em 10 existem só por limitação do Figma |
+| | `Progresso/Anel`, `Skeleton`, `Aviso` (Info, Sucesso, Alerta, Erro), `Nota` | |
+| Sobreposição | `Sheet/Base`, `Sheet/Cabeçalho` | Título, Subtítulo, Fechar |
+| | `Diálogo` | Tom: Alerta, Erro, Marca, Sucesso · Título, Texto, Confirmar |
+| | `Toast`, `Estado vazio` | |
+| Estrutura | `Navegação/Header`, `Navegação/Tab Bar`, `Onboarding/Cabeçalho`, `Título de seção`, `Rótulo de grupo`, `Divisor` | |
+| Listas e cards | `Lista/Item` | Final: Seta, Valor, Toggle, Nenhum · Título, Subtítulo, Valor, Ícone, Divisor |
+| | `Lista/Pessoa` | Final: Seta, Botão, Checkbox, Check, Nenhum |
+| | `Lista/Transação`, `Lista/Banco`, `Lista/Categoria`, `Lista/Parcela`, `Lista/Assinatura` (Selo: Nenhum, Sem uso, Reajuste), `Lista/Ranking` | |
+| | `Card/Meta`, `Card/Opção`, `Alerta/Item`, `Feed/Post`, `Feed/Reações` | |
+| Gráficos | `Gráfico/Coluna`, `Gráfico/Rosca`, `Gráfico/Medidor` | Desenhe com `react-native-svg` |
+| Ícones | `Ícone/*` | Traço 1,8, grade 24×24. Exporte os SVGs do Figma; não troque por outra biblioteca |
+| Marca | `Logo/Símbolo`, `Logo/Horizontal`, `App Icon` | |
+
+**Ordem para construir:** tema → tipografia → ícones → primitivos (Botões, Controles, Input, Avatar, Selo, Caixa de ícone, Barra) → estrutura (Header, Tab Bar, Sheet, Diálogo) → listas e cards → gráficos. Monte uma tela `/dev/catalogo` (só em desenvolvimento) que mostra todos os componentes e variantes, para comparar com o Figma.
 
 ### Padrões de interface
 - **Bottom sheets** para escolhas rápidas (período, filtros, categoria, limite) e **diálogos centrais** para confirmações destrutivas (ocultar, sair, excluir, desconectar).

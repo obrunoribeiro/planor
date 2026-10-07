@@ -9,6 +9,7 @@ Guia de trabalho em equipe para o Planor. Antes de codar: **leia o [`CONTEXTO.md
 ```bash
 git clone git@github.com:<usuario>/planor.git
 cd planor
+pnpm install
 ```
 
 Configure seu nome e e-mail (se ainda não fez):
@@ -17,6 +18,68 @@ Configure seu nome e e-mail (se ainda não fez):
 git config user.name "Seu Nome"
 git config user.email "seu@email.com"
 ```
+
+---
+
+## 1.5 Ambiente de desenvolvimento
+
+O banco de dados (Supabase/Postgres) e o Pluggy são **compartilhados** — um projeto só para as
+duas pessoas. A API e o app Expo, não: **cada pessoa roda a própria cópia, na própria máquina.**
+
+### Credenciais
+
+Peça pra quem já tem o projeto configurado (hoje, o Bruno) te passar o conteúdo do `.env` por um
+canal seguro — **nunca por commit, PR, issue ou mensagem de chat em texto puro**. O
+`SUPABASE_SERVICE_ROLE_KEY` em especial dá acesso total ao banco, sem as proteções normais; trate
+como senha. Copie pra um `.env` na raiz do repo (o `.env.example` mostra todas as chaves
+esperadas; esse arquivo nunca vai pro git).
+
+### A única linha que você edita sozinho: `EXPO_PUBLIC_API_URL`
+
+Todo o resto do `.env` é igual pros dois. Essa linha, não — ela aponta pro endereço onde **a sua
+própria API local** vai estar escutando, pra o app no **seu** celular conseguir chamá-la.
+
+1. Descubra o IP da sua máquina na sua rede Wi-Fi:
+   ```bash
+   ipconfig getifaddr en0        # macOS, Wi-Fi
+   ```
+2. No seu `.env`:
+   ```
+   EXPO_PUBLIC_API_URL=http://SEU_IP_AQUI:3333
+   ```
+3. Seu celular precisa estar **na mesma rede Wi-Fi** do computador que está rodando a API. Esse
+   IP muda se você trocar de rede (casa → trabalho, por exemplo) — repita o passo 1 e atualize o
+   `.env` quando isso acontecer.
+
+### Rodando tudo
+
+Dois terminais abertos ao mesmo tempo:
+
+```bash
+# Terminal 1 — API
+pnpm --filter @planor/api dev
+
+# Terminal 2 — app
+pnpm --filter @planor/mobile dev
+```
+
+Escaneie o QR code do terminal 2 com o **Expo Go no seu próprio celular**. Depois de editar o
+`.env`, reinicie os dois processos (`Ctrl+C` e roda de novo) — variáveis `EXPO_PUBLIC_*` só são
+lidas quando o Expo sobe, Fast Refresh não pega mudança de `.env`.
+
+### Sua conta
+
+Cadastre-se pelo próprio app, com o seu e-mail (código por e-mail, sem senha). Isso cria sua
+própria linha real em `auth.users` e `public.users` no banco compartilhado. **Os dados fictícios
+do seed (CONTEXTO.md §12) hoje só são anexados à conta do Bruno** — o `packages/db/src/seed.ts`
+busca o e-mail dele especificamente. Pra você, Home/Gastos vão aparecer no estado vazio (o que,
+aliás, é uma boa forma de testar esse estado) até o seed ganhar suporte a mais de uma identidade.
+
+### ⚠️ `pnpm db:seed` é destrutivo e compartilhado
+
+Esse comando **apaga e recria todas as tabelas de dados do produto** no banco — que é o mesmo
+banco pra vocês dois. Nunca rode sem avisar a outra pessoa antes; combine um horário, ou melhor,
+evite rodar fora de quando for realmente necessário (ex.: depois de mudar o schema).
 
 ---
 

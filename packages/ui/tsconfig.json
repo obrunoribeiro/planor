@@ -1,0 +1,4 @@
+{
+  "extends": "@planor/config/typescript/react-native.json",
+  "include": ["src"]
+}
