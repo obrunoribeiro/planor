@@ -144,13 +144,14 @@ protótipo do Figma.
 - Login com Apple — precisa do Apple Developer Program (US$99/ano), que ainda não existe.
 - Segurança: biometria, bloqueio automático ao sair do app, trocar e-mail e aparelhos conectados
   — só "Ocultar valores ao abrir" é real por enquanto (ver acima).
-- Pluggy: validar ponta a ponta com credenciais reais (pendente, ver acima). Depois disso, falta
-  ainda: tela de lista "Contas e cartões" com detalhe de cada conexão (CONTEXTO.md §6.10) — hoje
-  só o contador no card do plano usa dado real, a lista propriamente dita continua mock; avisos
-  de consentimento vencendo (7 e 1 dia antes) e a tela "Renovar acesso"; atualização automática a
-  cada 4-6h (job — depende do pg-boss, que também não está configurado em lugar nenhum ainda,
-  só instalado como dependência); fila assíncrona pros eventos `transactions/*` do webhook (hoje
-  só `item/*` é processado — ver "Decisões diferentes").
+- Pluggy: validado ponta a ponta (ver "Feito" acima). O que falta em volta disso: tela de lista
+  "Contas e cartões" com detalhe de cada conexão (CONTEXTO.md §6.10) — hoje só o contador no card
+  do plano usa dado real, a lista propriamente dita continua mock; avisos de consentimento
+  vencendo (7 e 1 dia antes) e a tela "Renovar acesso"; atualização automática a cada 4-6h (job —
+  depende do pg-boss, que também não está configurado em lugar nenhum ainda, só instalado como
+  dependência); fila assíncrona pros eventos `transactions/*` do webhook (hoje só `item/*` é
+  processado — ver "Decisões diferentes"); limpar a conexão duplicada vazia que sobrou dos testes
+  (sem urgência, é dado de dev).
 - Importar fatura em **PDF** — precisa de extração de texto + LLM pra estruturar em JSON
   validado com zod (CONTEXTO.md §6.2), e o provedor de IA final ainda é decisão em aberto
   (CONTEXTO.md §15.6). `POST /imports` já devolve `501` com uma mensagem clara pra esse caso.
