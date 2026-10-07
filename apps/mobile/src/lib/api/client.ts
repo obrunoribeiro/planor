@@ -35,3 +35,24 @@ export async function apiFetch<T>(
 
   return response.json() as Promise<T>;
 }
+
+/** Upload multipart (ex.: importar fatura) — sem `Content-Type` manual: o `fetch` do RN gera o
+ * boundary certo sozinho a partir do `FormData`, e sobrescrever quebraria o parse no servidor. */
+export async function apiUpload<T>(path: string, { accessToken, formData }: { accessToken: string; formData: FormData }): Promise<T> {
+  if (!API_URL) {
+    throw new Error('EXPO_PUBLIC_API_URL não definida — copie .env.example para .env na raiz do repo.');
+  }
+
+  const response = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    body: formData,
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new ApiError(response.status, body.error ?? `Erro ${response.status}`);
+  }
+
+  return response.json() as Promise<T>;
+}

@@ -103,6 +103,12 @@ export type AccountListItem = {
   type: 'checking' | 'savings' | 'credit_card';
 };
 
+export type ImportResultResponse = {
+  total: number;
+  imported: number;
+  duplicates: number;
+};
+
 export type TransactionListItem = {
   id: string;
   postedAt: string;

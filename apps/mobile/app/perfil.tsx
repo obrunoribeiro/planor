@@ -108,8 +108,7 @@ export default function PerfilScreen() {
         <Group>
           {/* TODO: navegar pra /perfil/contas quando existir. */}
           <ListItem icon="banco" title="Contas e cartões" value={`${account.connectedBanksCount} conectadas`} />
-          {/* TODO: navegar pro fluxo de importar fatura quando existir. */}
-          <ListItem icon="upload" title="Importar fatura ou extrato" />
+          <ListItem icon="upload" title="Importar fatura ou extrato" onPress={() => router.push('/perfil/importar-fatura')} />
           {/* TODO: navegar pra /perfil/meu-plano quando existir. */}
           <ListItem icon="estrela" title="Meu plano" value={account.planLabel} last />
         </Group>

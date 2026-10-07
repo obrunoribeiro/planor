@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth/AuthProvider';
-import { apiFetch } from './client';
+import { apiFetch, apiUpload } from './client';
 import type {
   AccountListItem,
   CategoryListItem,
   FutureTimelineResponse,
   HomeResponse,
+  ImportResultResponse,
   MeResponse,
   SettingsResponse,
   SpendingSummaryResponse,
@@ -161,5 +162,23 @@ export function useCreateCategoryRuleMutation() {
   return useMutation({
     mutationFn: (body: { matchType: 'merchant' | 'keyword'; pattern: string; categoryId: string; expenseKind?: 'fixed' | 'variable' }) =>
       apiFetch<{ id: string }>('/category-rules', { method: 'POST', accessToken: accessToken!, body: JSON.stringify(body) }),
+  });
+}
+
+export function useImportOfxMutation() {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ accountId, fileUri, fileName, mimeType }: { accountId: string; fileUri: string; fileName: string; mimeType: string }) => {
+      const formData = new FormData();
+      formData.append('accountId', accountId);
+      // RN aceita esse shape de objeto no lugar de um Blob de verdade pra arquivo local (URI do
+      // expo-document-picker) — é assim que o `fetch` do React Native sobe arquivo de disco.
+      formData.append('file', { uri: fileUri, name: fileName, type: mimeType } as unknown as Blob);
+      return apiUpload<ImportResultResponse>('/imports', { accessToken: accessToken!, formData });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    },
   });
 }
