@@ -111,9 +111,21 @@ protótipo do Figma.
   `POST /webhooks/aggregator` (só processa eventos `item/*`, que vêm com `clientUserId` — ver
   "Decisões diferentes"). Mobile: `apps/mobile/app/perfil/conectar-banco.tsx`, usando o SDK
   oficial `react-native-pluggy-connect` (funciona no Expo Go — é só WebView por baixo, não
-  precisa do build de desenvolvimento que o Google exige). **Não testado ponta a ponta ainda**
-  — precisa das credenciais do Pluggy e de um túnel ngrok (ver `CONTRIBUTING.md`, "Open Finance
-  (Pluggy) em desenvolvimento"), que o Bruno está configurando.
+  precisa do build de desenvolvimento que o Google exige).
+  **Validado ponta a ponta em 2026-10-07** com o Nubank de verdade do Bruno (via Meu Pluggy):
+  conta corrente + cartão de crédito sincronizados, 857 transações importadas, valores e sinais
+  corretos, nova sincronização não duplica nada. Achado e corrigido nesse teste: `GET /transactions`
+  (página/pageSize) estava descontinuado pelo Pluggy (410) — trocado por `GET /v2/transactions`
+  com cursor (`lib/pluggy.ts`, `listTransactions`). Único ponto que o teste real não cobriu: o
+  sinal do valor numérico em conta tipo `BANK` (não precisou confiar nisso — a importação usa o
+  campo explícito `DEBIT`/`CREDIT` do Pluggy).
+  **Observação importante sobre "Meu Pluggy":** o widget não mostra o conector de testes
+  "Pluggy Bank" nem bancos reais direto — só aparece "MeuPluggy", que dá acesso às contas que o
+  próprio usuário já conectou em meu.pluggy.ai (um app separado). Ou seja, esse plano gratuito só
+  serve pra conectar **a própria conta de quem tem as credenciais** (hoje, só o Bruno) — não dá
+  pra outro usuário (Ana, por exemplo) conectar o banco dele pelo Planor com essas credenciais.
+  Validar com os sócios se isso é aceitável pro beta fechado ou se precisa de um plano de
+  desenvolvedor de verdade antes de abrir pra mais gente (ver CONTEXTO.md §15.1).
 
 **Falta:**
 - Login com Apple — precisa do Apple Developer Program (US$99/ano), que ainda não existe.
@@ -200,13 +212,12 @@ protótipo do Figma.
   pede o job assíncrono do pg-boss (§9), que ainda não existe em lugar nenhum. Na prática, isso
   não trava nada agora: `item/updated` (que processamos) dispara nos mesmos ciclos de
   sincronização que trazem transação nova.
-- **API do Pluggy foi implementada a partir da documentação pública (docs.pluggy.ai), sem
-  credencial real pra testar ainda** — dois pontos específicos ficam marcados com comentário em
-  `apps/api/src/lib/pluggy.ts` pra conferir assim que tivermos acesso de verdade: o nome exato do
-  campo de paginação de `GET /accounts` (`results` vs. `data`), e se o sinal do valor em contas
-  tipo `BANK` segue a mesma convenção documentada pra `CREDIT` (positivo = gasto). Pra não depender
-  do sinal (que só está confirmado pra cartão), a importação usa o campo explícito `DEBIT`/`CREDIT`
-  do Pluggy em vez do sinal numérico — mais seguro nos dois casos.
+- **API do Pluggy foi implementada a partir da documentação pública, depois validada contra uma
+  conexão real** (ver "Feito" acima) — `GET /accounts` usa mesmo `results` como documentado, mas
+  `GET /transactions` estava descontinuado (410) e foi trocado por `GET /v2/transactions` com
+  cursor. O sinal do valor em conta `BANK` não precisou ser confirmado: a importação sempre usou
+  o campo explícito `DEBIT`/`CREDIT` do Pluggy em vez do sinal numérico, por precaução — e isso
+  se confirmou a decisão certa.
 - **`POST /webhooks/aggregator` não verifica assinatura criptográfica** — o Pluggy não assina o
   payload do webhook (confirmado na documentação deles). A única verificação possível é um header
   customizado que a gente mesmo define ao registrar o webhook (`PLUGGY_WEBHOOK_SECRET`,

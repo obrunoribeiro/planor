@@ -1,12 +1,13 @@
 // Cliente da API do Pluggy — CONTEXTO.md §6.2, plano "Meu Pluggy" (gratuito, ver §15).
 //
-// ATENÇÃO: os formatos abaixo foram montados a partir da documentação pública do Pluggy
-// (docs.pluggy.ai) em 2026-10-07, sem credencial real pra testar contra a API de verdade ainda.
-// Dois pontos específicos não estavam 100% confirmados na documentação e merecem atenção ao
-// validar com uma conexão real:
-//   1. O formato exato de paginação de `/accounts` (`results` vs. `data` como nome do array).
-//   2. O sinal do valor em contas tipo BANK (confirmado só pra CREDIT: positivo = gasto no
-//      cartão, negativo = pagamento da fatura — o oposto da nossa convenção interna).
+// Validado em 2026-10-07 contra uma conexão real (Nubank, via Meu Pluggy): auth, connect token,
+// webhook, `/accounts` (campo `results`, confirmado) e `/items` funcionam como documentado.
+// Única correção precisa: `GET /transactions` (página/pageSize) está descontinuado — devolve
+// 410 — e foi trocado por `GET /v2/transactions` com cursor (ver `listTransactions`).
+//
+// Ainda não confirmado com dado real: o sinal do valor em contas tipo BANK (só está confirmado
+// pra CREDIT nos docs — positivo = gasto no cartão). Por isso a importação usa o campo explícito
+// `DEBIT`/`CREDIT` do Pluggy em vez do sinal numérico, que é seguro nos dois casos.
 import { env } from '../env';
 
 const BASE_URL = 'https://api.pluggy.ai';
@@ -97,16 +98,19 @@ export type PluggyTransaction = {
   type: 'DEBIT' | 'CREDIT';
 };
 
+/** `GET /transactions` (página/pageSize) foi descontinuado pelo Pluggy em favor de
+ * `GET /v2/transactions`, com paginação por cursor. `next` vem pronto pra usar (já é a própria
+ * query string da próxima página, ex. `?accountId=...&after=...`) — NÃO é um token cru pra
+ * remontar com `accountId=` de novo (confirmado batendo num 400 `INVALID_CURSOR` numa conexão
+ * real: o erro da própria API explica isso melhor que a doc). */
 export async function listTransactions(accountId: string): Promise<PluggyTransaction[]> {
   const transactions: PluggyTransaction[] = [];
-  let page = 1;
+  let path = `/v2/transactions?accountId=${accountId}`;
   for (;;) {
-    const { results, totalPages } = await pluggyFetch<{ results: PluggyTransaction[]; totalPages: number }>(
-      `/transactions?accountId=${accountId}&page=${page}&pageSize=500`,
-    );
+    const { results, next } = await pluggyFetch<{ results: PluggyTransaction[]; next: string | null }>(path);
     transactions.push(...results);
-    if (page >= totalPages) break;
-    page += 1;
+    if (!next) break;
+    path = `/v2/transactions${next}`;
   }
   return transactions;
 }
