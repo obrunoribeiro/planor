@@ -9,7 +9,9 @@
 
 Ele é a fonte da verdade do produto: funcionalidades, escopo, stack, glossário, design system, modelo de dados, rotas da API, jobs, dados fictícios e ordem de implementação. Não implemente nada "de memória". Se uma decisão mudar, atualize o `CONTEXTO.md` no mesmo commit.
 
-Depois do `CONTEXTO.md`, leia o `CLAUDE.md` (princípios inegociáveis) e o `CONTRIBUTING.md` (branches e PRs).
+Leia também o [`PROGRESSO.md`](./PROGRESSO.md): diz o que já é real no código (vs. mock) e o que falta de cada fase — evita redescobrir ou contradizer decisões de outra sessão.
+
+Depois, leia o `CLAUDE.md` (princípios inegociáveis) e o `CONTRIBUTING.md` (seção "1.5 Ambiente de desenvolvimento" se for sua primeira vez rodando o projeto; branches e PRs pro dia a dia).
 
 ## ⛔ REGRA Nº 2
 

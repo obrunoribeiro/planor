@@ -14,7 +14,7 @@ Não é opcional e não vale "achar que já sabe de memória". O `CONTEXTO.md` �
 
 ### Como aplicar a regra na prática
 
-1. **No início de toda tarefa**, leia o `CONTEXTO.md` — pelo menos as seções relevantes. Se a tarefa toca produto/escopo, leia a seção 6 correspondente por inteiro.
+1. **No início de toda tarefa**, leia o `CONTEXTO.md` — pelo menos as seções relevantes. Se a tarefa toca produto/escopo, leia a seção 6 correspondente por inteiro. Leia também o [`PROGRESSO.md`](./PROGRESSO.md): ele diz o que já é real no código (vs. o que ainda é mock) e evita redescobrir ou contradizer o que já foi decidido em outra sessão.
 2. **Antes de propor um plano**, cite de qual seção do `CONTEXTO.md` cada decisão veio.
 3. **Se o `CONTEXTO.md` não cobrir o caso**, não invente: pergunte ao Bruno ou registre a dúvida na seção 15 ("Decisões em aberto").
 4. **Se o código contradisser o `CONTEXTO.md`**, o `CONTEXTO.md` vence — a menos que o Bruno diga o contrário por escrito (e aí o `CONTEXTO.md` é atualizado).
@@ -86,7 +86,10 @@ Resumo do que está na seção 1 do `CONTEXTO.md`. Qualquer PR que viole isso de
 
 ## Fluxo de trabalho em equipe
 
-Este repositório é compartilhado entre o Bruno e mais uma pessoa. Veja [`CONTRIBUTING.md`](./CONTRIBUTING.md) para o fluxo de branches, commits e Pull Requests.
+Este repositório é compartilhado entre o Bruno e mais uma pessoa. Primeira vez rodando o
+projeto? [`CONTRIBUTING.md`](./CONTRIBUTING.md) tem a seção "1.5 Ambiente de desenvolvimento"
+(`.env`, credenciais compartilhadas, como testar no próprio celular) além do fluxo de branches,
+commits e Pull Requests.
 
 Regras curtas:
 - **Nunca commitar direto na `main`.** Sempre branch + Pull Request.
