@@ -58,12 +58,21 @@ protótipo do Figma.
 - **Home, Gastos, Futuro e Perfil lendo dados reais da API** (não mock) — ver `apps/mobile/src/lib/api/`.
   Rotas novas/estendidas: `GET /home` (sobra, comprometido, plano da semana, cards),
   `GET /spending/summary` (resumo de Gastos), `GET /future/timeline` (linha do tempo do Futuro).
+- **"Ocultar valores ao abrir" persiste de verdade** (`GET`/`PATCH /settings`, tabela `settings`
+  já existia no schema). Nova sheet **Segurança** (`apps/mobile/src/features/perfil/SegurancaSheet.tsx`),
+  aberta a partir do Perfil, com o toggle real. `SettingsHydrator` (em `app/_layout.tsx`) aplica o
+  valor salvo ao `useHiddenValuesStore` uma vez na abertura do app; o olho da Home continua
+  controlando a sessão livremente depois disso. Os outros itens de Segurança do CONTEXTO.md §6.10
+  (biometria, bloqueio automático, trocar e-mail, aparelhos conectados) **não** estão nessa sheet
+  ainda — ficam para quando tiverem sua própria implementação.
 
 **Falta:**
 - Login com Apple — precisa do Apple Developer Program (US$99/ano), que ainda não existe.
 - Login com Google — precisa de um OAuth Client novo no Google Cloud **específico deste projeto
   Supabase** (cada projeto tem sua própria URL de callback; um client de outro app/projeto não
   serve, mesmo que seja do mesmo dono).
+- Segurança: biometria, bloqueio automático ao sair do app, trocar e-mail e aparelhos conectados
+  — só "Ocultar valores ao abrir" é real por enquanto (ver acima).
 - Pluggy (Open Finance) — nada implementado ainda. `apps/api/src/routes/connections.ts` é só
   stub. Precisa de túnel público (ngrok ou deploy) pra testar o webhook, já que o agregador
   precisa alcançar a API de fora da rede local.
@@ -72,11 +81,10 @@ protótipo do Figma.
 - Importar fatura (PDF/OFX) — não começou.
 - IA (`apps/mobile/app/(tabs)/ia.tsx`) continua 100% mockada — não é uma lacuna de "dados reais"
   como as outras, é que a função em si (chat com function calling) é escopo da Fase 3.
-- Perfil: só o bloco de usuário/plano e o formulário de edição são reais. Os grupos "Conta"
-  (contas conectadas), "Preferências" (segurança), "Juntos" (casa/amigos/indicação) continuam
-  com texto de exemplo de `lib/mocks/perfil.ts` — dependem de Pluggy/Fase 5.
-- "Ocultar valores ao abrir" (configuração em Segurança, CONTEXTO.md §6.10) não existe — o olho
-  da Home (`useHiddenValuesStore`) é só estado em memória da sessão atual, não persiste.
+- Perfil: o bloco de usuário/plano, o formulário de edição e o toggle de Segurança são reais. Os
+  grupos "Conta" (contas conectadas), o resto de "Preferências" (notificações, privacidade) e
+  "Juntos" (casa/amigos/indicação) continuam com texto de exemplo de `lib/mocks/perfil.ts` —
+  dependem de Pluggy/Fase 5.
 
 ---
 

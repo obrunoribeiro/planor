@@ -79,3 +79,13 @@ export type MeResponse = {
   payday: number | null;
   plan: Plan;
 };
+
+export type SettingsResponse = {
+  userId: string;
+  hideValuesOnOpen: boolean;
+  biometricLock: boolean;
+  lockAfterSeconds: number;
+  quietHoursStart: string | null;
+  quietHoursEnd: string | null;
+  useAnonymizedData: boolean;
+};

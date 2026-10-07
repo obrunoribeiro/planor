@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { apiFetch } from './client';
-import type { FutureTimelineResponse, HomeResponse, MeResponse, SpendingSummaryResponse } from './types';
+import type { FutureTimelineResponse, HomeResponse, MeResponse, SettingsResponse, SpendingSummaryResponse } from './types';
 
 function useAccessToken() {
   return useAuth().session?.access_token;
@@ -52,6 +52,27 @@ export function useUpdateMeMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['me'] });
       void queryClient.invalidateQueries({ queryKey: ['home'] });
+    },
+  });
+}
+
+export function useSettingsQuery() {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['settings'],
+    queryFn: () => apiFetch<SettingsResponse>('/settings', { accessToken: accessToken! }),
+    enabled: !!accessToken,
+  });
+}
+
+export function useUpdateSettingsMutation() {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: { hideValuesOnOpen?: boolean }) =>
+      apiFetch<SettingsResponse>('/settings', { method: 'PATCH', accessToken: accessToken!, body: JSON.stringify(patch) }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['settings'], updated);
     },
   });
 }

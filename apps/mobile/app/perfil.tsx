@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/auth/AuthProvider';
 import { useMeQuery } from '@/lib/api/queries';
 import { initialsFromName } from '@/lib/format';
 import { EditarPerfilSheet } from '@/features/perfil/EditarPerfilSheet';
+import { SegurancaSheet } from '@/features/perfil/SegurancaSheet';
 import { perfilMock } from '@/lib/mocks/perfil';
 import type { Plan } from '@planor/shared';
 
@@ -35,6 +36,7 @@ export default function PerfilScreen() {
   const { data: me, isPending, isError, refetch } = useMeQuery();
   const [signOutVisible, setSignOutVisible] = useState(false);
   const [editVisible, setEditVisible] = useState(false);
+  const [segurancaVisible, setSegurancaVisible] = useState(false);
 
   if (isPending) {
     return (
@@ -116,8 +118,7 @@ export default function PerfilScreen() {
         <Group>
           {/* TODO: navegar pra /perfil/notificacoes quando existir. */}
           <ListItem icon="sino" title="Notificações" />
-          {/* TODO: navegar pra /perfil/seguranca quando existir. */}
-          <ListItem icon="cadeado" title="Segurança" value={security.biometricLabel} />
+          <ListItem icon="cadeado" title="Segurança" value={security.biometricLabel} onPress={() => setSegurancaVisible(true)} />
           {/* TODO: navegar pra /perfil/privacidade quando existir. */}
           <ListItem icon="escudo" title="Privacidade e dados" />
           {/* TODO: Planor no WhatsApp é v2 (§6.10) — sem destino ainda. */}
@@ -157,6 +158,7 @@ export default function PerfilScreen() {
       />
 
       <EditarPerfilSheet visible={editVisible} onClose={() => setEditVisible(false)} me={me} />
+      <SegurancaSheet visible={segurancaVisible} onClose={() => setSegurancaVisible(false)} />
     </View>
   );
 }

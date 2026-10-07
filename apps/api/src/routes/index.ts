@@ -9,12 +9,14 @@ import { healthRoutes } from './health';
 import { homeRoutes } from './home';
 import { householdRoutes } from './household';
 import { meRoutes } from './me';
+import { settingsRoutes } from './settings';
 import { socialRoutes } from './social';
 import { transactionRoutes } from './transactions';
 
 export async function registerRoutes(app: FastifyInstance) {
   await app.register(healthRoutes);
   await app.register(meRoutes);
+  await app.register(settingsRoutes);
   await app.register(homeRoutes);
   await app.register(connectionRoutes);
   await app.register(transactionRoutes);
