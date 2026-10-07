@@ -80,17 +80,16 @@ aliás, é uma boa forma de testar esse estado) até o seed ganhar suporte a mai
 O Supabase só redireciona de volta pro app depois do login no Google se a URL de retorno estiver
 na lista "Redirect URLs" (Authentication → URL Configuration, no dashboard do Supabase — é
 compartilhada, então quem adicionar já resolve pros dois). Como estamos testando pelo **Expo Go**
-(não um build de verdade), essa URL inclui o IP da sua máquina e muda de pessoa pra pessoa (e de
-rede em rede, igual o `EXPO_PUBLIC_API_URL` acima):
+(não um build de verdade), essa URL inclui o IP da sua máquina, que muda de rede em rede — em vez
+de cadastrar o IP exato (e ter que atualizar toda vez que ele mudar), adicione o coringa:
 
-1. Rode o app e toque em "Continuar com Google" uma vez — vai dar erro (esperado).
-2. O terminal do Expo (`pnpm --filter @planor/mobile dev`) mostra algo como
-   `exp://SEU_IP:8081/--/...` no log — é esse o valor.
-3. Adicione `exp://SEU_IP:8081/**` à lista de Redirect URLs no Supabase.
-4. Repita o passo 2–3 sempre que seu IP mudar.
+```
+exp://**
+```
 
-Quando o app ganhar um build de desenvolvimento de verdade (EAS dev client) em vez do Expo Go, o
-redirecionamento passa a ser fixo (`planor://**`) e esse passo manual deixa de ser necessário.
+Isso cobre qualquer IP/porta que o Expo Go usar. Quando o app ganhar um build de desenvolvimento
+de verdade (EAS dev client) em vez do Expo Go, o redirecionamento passa a ser fixo
+(`planor://**`) — pode adicionar esse também desde já, não tem custo.
 
 ### ⚠️ `pnpm db:seed` é destrutivo e compartilhado
 
