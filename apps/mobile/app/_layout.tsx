@@ -16,6 +16,7 @@ import {
   Manrope_800ExtraBold,
 } from '@/lib/fonts';
 import { AuthProvider, useAuth } from '@/lib/auth/AuthProvider';
+import { SettingsHydrator } from '@/lib/stores/SettingsHydrator';
 import { colors } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -68,6 +69,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <AuthGate>
+              <SettingsHydrator />
               <StatusBar style="light" />
               <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.dark.bg.default } }} />
             </AuthGate>

@@ -9,10 +9,12 @@
     "start": "tsx src/server.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "pluggy:register-webhook": "tsx src/scripts/register-pluggy-webhook.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",
+    "@fastify/multipart": "^10.1.2",
     "@fastify/sensible": "^6.0.2",
     "@planor/db": "workspace:*",
     "@planor/shared": "workspace:*",

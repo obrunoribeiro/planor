@@ -7,6 +7,7 @@ export type ToggleProps = {
   value: boolean;
   onValueChange?: (value: boolean) => void;
   accessibilityLabel: string;
+  disabled?: boolean;
 };
 
 const TRACK_WIDTH = 48;
@@ -14,9 +15,10 @@ const TRACK_HEIGHT = 28;
 const KNOB_SIZE = 22;
 const KNOB_MARGIN = 3;
 
-export function Toggle({ value, onValueChange, accessibilityLabel }: ToggleProps) {
+export function Toggle({ value, onValueChange, accessibilityLabel, disabled }: ToggleProps) {
   const trackStyle = useAnimatedStyle(() => ({
     backgroundColor: withTiming(value ? colors.dark.bg.brand : colors.dark.border.strong, { duration: 150 }),
+    opacity: disabled ? 0.5 : 1,
   }));
 
   const knobStyle = useAnimatedStyle(() => ({
@@ -25,9 +27,9 @@ export function Toggle({ value, onValueChange, accessibilityLabel }: ToggleProps
 
   return (
     <Pressable
-      onPress={() => onValueChange?.(!value)}
+      onPress={() => !disabled && onValueChange?.(!value)}
       accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
+      accessibilityState={{ checked: value, disabled }}
       accessibilityLabel={accessibilityLabel}
       hitSlop={8}
     >
