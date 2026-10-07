@@ -9,7 +9,7 @@ import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@/lib/auth/AuthProvider';
-import { useMeQuery } from '@/lib/api/queries';
+import { useConnectionsQuery, useMeQuery } from '@/lib/api/queries';
 import { initialsFromName } from '@/lib/format';
 import { EditarPerfilSheet } from '@/features/perfil/EditarPerfilSheet';
 import { SegurancaSheet } from '@/features/perfil/SegurancaSheet';
@@ -34,6 +34,8 @@ export default function PerfilScreen() {
   const { account, security, household, friends, referral, version } = perfilMock;
   const { signOut } = useAuth();
   const { data: me, isPending, isError, refetch } = useMeQuery();
+  const { data: connections } = useConnectionsQuery();
+  const connectedBanksCount = connections?.filter((c) => c.status === 'connected').length ?? 0;
   const [signOutVisible, setSignOutVisible] = useState(false);
   const [editVisible, setEditVisible] = useState(false);
   const [segurancaVisible, setSegurancaVisible] = useState(false);
@@ -96,7 +98,7 @@ export default function PerfilScreen() {
           <Icon name="estrela" size={22} color={colors.dark.text.primary} />
           <View style={styles.planTexts}>
             <Text style={styles.planLabel}>{PLAN_LABEL[me.plan]}</Text>
-            <Text style={styles.planDetail}>{account.connectedBanksCount} bancos conectados</Text>
+            <Text style={styles.planDetail}>{connectedBanksCount} bancos conectados</Text>
           </View>
           {/* TODO: navegar pra /paywall quando essa tela existir (Fase 4, §13). */}
           <Pressable style={styles.planButton}>
@@ -106,8 +108,9 @@ export default function PerfilScreen() {
 
         <GroupLabel>CONTA</GroupLabel>
         <Group>
-          {/* TODO: navegar pra /perfil/contas quando existir. */}
-          <ListItem icon="banco" title="Contas e cartões" value={`${account.connectedBanksCount} conectadas`} />
+          {/* TODO: navegar pra /perfil/contas (lista com detalhe de cada conexão) quando existir. */}
+          <ListItem icon="banco" title="Contas e cartões" value={`${connectedBanksCount} conectadas`} />
+          <ListItem icon="banco" title="Conectar banco" onPress={() => router.push('/perfil/conectar-banco')} />
           <ListItem icon="upload" title="Importar fatura ou extrato" onPress={() => router.push('/perfil/importar-fatura')} />
           {/* TODO: navegar pra /perfil/meu-plano quando existir. */}
           <ListItem icon="estrela" title="Meu plano" value={account.planLabel} last />

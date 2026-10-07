@@ -9,7 +9,8 @@
     "start": "tsx src/server.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "pluggy:register-webhook": "tsx src/scripts/register-pluggy-webhook.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",

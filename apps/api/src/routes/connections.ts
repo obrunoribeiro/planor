@@ -1,11 +1,21 @@
 // Conexão bancária (Open Finance / Pluggy), importação de fatura e webhooks — CONTEXTO.md §6.2, §8.
 import { and, eq } from 'drizzle-orm';
-import { accounts, transactions } from '@planor/db';
+import { accounts, connections, institutions, transactions } from '@planor/db';
 import { parseOfx } from '@planor/shared';
 import type { FastifyInstance } from 'fastify';
+import { env } from '../env';
 import { requireUserId } from '../lib/auth';
 import { db } from '../lib/db';
+import { createConnectToken, deleteItem } from '../lib/pluggy';
+import { syncItem } from '../lib/pluggySync';
 import { notImplemented } from '../lib/stub';
+
+type PluggyWebhookPayload = {
+  event: string;
+  eventId?: string;
+  itemId?: string;
+  clientUserId?: string;
+};
 
 /** Limpeza mecânica da descrição crua do banco (§6.3, passo 1) — só espaço e maiúsculas, sem
  * dicionário de comerciante/IA (isso é a Fase 3, ver PROGRESSO.md). */
@@ -19,20 +29,115 @@ function normalizeDescription(raw: string): string {
 }
 
 export async function connectionRoutes(app: FastifyInstance) {
-  app.post('/connections/token', async (_req, reply) =>
-    notImplemented(reply, 'connectToken do agregador — Fase 2 (§6.2)'),
-  );
-  app.get('/connections', async (_req, reply) => notImplemented(reply, 'Listar conexões — Fase 2 (§6.2)'));
-  app.post('/connections/:id/sync', async (_req, reply) =>
-    notImplemented(reply, 'Atualizar agora — Fase 2 (§6.2)'),
-  );
-  app.delete('/connections/:id', async (_req, reply) =>
-    notImplemented(reply, 'Desconectar (revoga consentimento) — Fase 2 (§6.2)'),
-  );
+  app.post('/connections/token', async (request, reply) => {
+    const userId = await requireUserId(request, reply);
+    if (!userId) return;
 
-  app.post('/webhooks/aggregator', async (_req, reply) =>
-    notImplemented(reply, 'item/created, item/updated, item/error, transactions/* — Fase 2 (§6.2)'),
-  );
+    const { itemId } = (request.body as { itemId?: string } | null) ?? {};
+    try {
+      const accessToken = await createConnectToken({ itemId, clientUserId: userId });
+      return { accessToken };
+    } catch (err) {
+      app.log.error(err, 'falha ao criar connect token do Pluggy');
+      return reply.code(502).send({ error: 'pluggy_unavailable' });
+    }
+  });
+
+  // Chamado pelo app logo depois do `onSuccess` do widget Pluggy Connect — não depende do
+  // webhook ter chegado ainda (em dev, o ngrok pode não estar registrado, ou demorar). O webhook
+  // continua sendo o jeito de manter sincronizado depois disso (atualização automática, §6.2).
+  app.post('/connections/sync-item', async (request, reply) => {
+    const userId = await requireUserId(request, reply);
+    if (!userId) return;
+
+    const { itemId } = (request.body as { itemId?: string } | null) ?? {};
+    if (!itemId) return reply.code(400).send({ error: 'item_id_missing' });
+
+    try {
+      return await syncItem(userId, itemId);
+    } catch (err) {
+      app.log.error(err, 'falha ao sincronizar item recém-conectado do Pluggy');
+      return reply.code(502).send({ error: 'pluggy_unavailable' });
+    }
+  });
+
+  app.get('/connections', async (request, reply) => {
+    const userId = await requireUserId(request, reply);
+    if (!userId) return;
+
+    return db
+      .select({
+        id: connections.id,
+        status: connections.status,
+        consentExpiresAt: connections.consentExpiresAt,
+        lastSyncAt: connections.lastSyncAt,
+        errorCode: connections.errorCode,
+        institutionName: institutions.name,
+        institutionLogo: institutions.logo,
+      })
+      .from(connections)
+      .innerJoin(institutions, eq(institutions.id, connections.institutionId))
+      .where(eq(connections.userId, userId));
+  });
+
+  app.post('/connections/:id/sync', async (request, reply) => {
+    const userId = await requireUserId(request, reply);
+    if (!userId) return;
+    const { id } = request.params as { id: string };
+
+    const [connection] = await db.select().from(connections).where(and(eq(connections.id, id), eq(connections.userId, userId)));
+    if (!connection) return reply.code(404).send({ error: 'connection_not_found' });
+
+    try {
+      return await syncItem(userId, connection.aggregatorItemId);
+    } catch (err) {
+      app.log.error(err, 'falha ao sincronizar conexão manualmente');
+      return reply.code(502).send({ error: 'pluggy_unavailable' });
+    }
+  });
+
+  app.delete('/connections/:id', async (request, reply) => {
+    const userId = await requireUserId(request, reply);
+    if (!userId) return;
+    const { id } = request.params as { id: string };
+
+    const [connection] = await db.select().from(connections).where(and(eq(connections.id, id), eq(connections.userId, userId)));
+    if (!connection) return reply.code(404).send({ error: 'connection_not_found' });
+
+    try {
+      await deleteItem(connection.aggregatorItemId);
+    } catch (err) {
+      app.log.error(err, 'falha ao desconectar item no Pluggy — marcando desconectado localmente mesmo assim');
+    }
+
+    await db.update(connections).set({ status: 'disconnected' }).where(eq(connections.id, id));
+    return reply.code(204).send();
+  });
+
+  app.post('/webhooks/aggregator', async (request, reply) => {
+    // O Pluggy não assina o payload do webhook — esse header customizado (definido por nós ao
+    // registrar o webhook, ver lib/pluggy.ts `registerWebhook`) é a única verificação possível.
+    if (env.PLUGGY_WEBHOOK_SECRET && request.headers['x-planor-webhook-secret'] !== env.PLUGGY_WEBHOOK_SECRET) {
+      return reply.code(401).send({ error: 'invalid_webhook_secret' });
+    }
+
+    const payload = request.body as PluggyWebhookPayload;
+    app.log.info({ event: payload?.event, itemId: payload?.itemId }, 'webhook do Pluggy recebido');
+
+    // Só processa eventos item/* (têm itemId + clientUserId no payload). transactions/* e
+    // connector/* não trazem clientUserId — tratar isso direito depende do job assíncrono
+    // (pg-boss, §9) que ainda não existe; por ora só confirma recebido (ver PROGRESSO.md).
+    if (payload?.itemId && payload.clientUserId && payload.event?.startsWith('item')) {
+      try {
+        await syncItem(payload.clientUserId, payload.itemId);
+      } catch (err) {
+        app.log.error(err, 'falha ao sincronizar item do Pluggy a partir do webhook');
+      }
+    }
+
+    return reply.code(200).send({ received: true });
+  });
+
   app.post('/webhooks/revenuecat', async (_req, reply) =>
     notImplemented(reply, 'Entitlement do RevenueCat — Fase 4 (§6.15)'),
   );

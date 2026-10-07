@@ -100,15 +100,32 @@ protótipo do Figma.
   (`accountId` + `externalId`). Tela nova `apps/mobile/app/perfil/importar-fatura.tsx`
   (`expo-document-picker`), aberta a partir de Perfil → "Importar fatura ou extrato". PDF
   devolve `501` de propósito (ver "Decisões diferentes" abaixo).
+- **Pluggy (Open Finance) implementado** — plano "Meu Pluggy" (decisão §15.1, ver CONTEXTO.md
+  §6.2). `apps/api/src/lib/pluggy.ts` (cliente HTTP: auth, connect token, items, contas,
+  transações, registrar webhook) e `apps/api/src/lib/pluggySync.ts` (grava item+contas+cartão+
+  transações no banco, idempotente — índices únicos novos em `accounts.external_id`,
+  `connections.aggregator_item_id` e `institutions.aggregator_id`, migração
+  `0001_steep_agent_brand.sql`). Rotas reais: `POST /connections/token`,
+  `POST /connections/sync-item` (chamado pelo app logo após conectar, não depende do webhook já
+  estar registrado), `GET /connections`, `POST /connections/:id/sync`, `DELETE /connections/:id`,
+  `POST /webhooks/aggregator` (só processa eventos `item/*`, que vêm com `clientUserId` — ver
+  "Decisões diferentes"). Mobile: `apps/mobile/app/perfil/conectar-banco.tsx`, usando o SDK
+  oficial `react-native-pluggy-connect` (funciona no Expo Go — é só WebView por baixo, não
+  precisa do build de desenvolvimento que o Google exige). **Não testado ponta a ponta ainda**
+  — precisa das credenciais do Pluggy e de um túnel ngrok (ver `CONTRIBUTING.md`, "Open Finance
+  (Pluggy) em desenvolvimento"), que o Bruno está configurando.
 
 **Falta:**
 - Login com Apple — precisa do Apple Developer Program (US$99/ano), que ainda não existe.
 - Segurança: biometria, bloqueio automático ao sair do app, trocar e-mail e aparelhos conectados
   — só "Ocultar valores ao abrir" é real por enquanto (ver acima).
-- Pluggy (Open Finance) — nada implementado ainda. `apps/api/src/routes/connections.ts` é só
-  stub pro ciclo de vida de conexão (token, sync, desconectar, webhook) — só `/imports` saiu dali.
-  Precisa de túnel público (ngrok ou deploy) pra testar o webhook, já que o agregador precisa
-  alcançar a API de fora da rede local.
+- Pluggy: validar ponta a ponta com credenciais reais (pendente, ver acima). Depois disso, falta
+  ainda: tela de lista "Contas e cartões" com detalhe de cada conexão (CONTEXTO.md §6.10) — hoje
+  só o contador no card do plano usa dado real, a lista propriamente dita continua mock; avisos
+  de consentimento vencendo (7 e 1 dia antes) e a tela "Renovar acesso"; atualização automática a
+  cada 4-6h (job — depende do pg-boss, que também não está configurado em lugar nenhum ainda,
+  só instalado como dependência); fila assíncrona pros eventos `transactions/*` do webhook (hoje
+  só `item/*` é processado — ver "Decisões diferentes").
 - Importar fatura em **PDF** — precisa de extração de texto + LLM pra estruturar em JSON
   validado com zod (CONTEXTO.md §6.2), e o provedor de IA final ainda é decisão em aberto
   (CONTEXTO.md §15.6). `POST /imports` já devolve `501` com uma mensagem clara pra esse caso.
@@ -176,6 +193,24 @@ protótipo do Figma.
   do CONTEXTO.md §6.3 ("IFOOD *PIZZARIA BELLA" → "Pizzaria Bella Massa") exige saber o nome real
   do estabelecimento, que só um dicionário de comerciantes ou IA resolve (ver item do pipeline
   automático, acima). Sem isso, vira "Ifood *pizzaria Bella" em vez do nome comercial bonito.
+- **Webhook do Pluggy só processa eventos `item/*`** — segundo a documentação do Pluggy, só esses
+  eventos vêm com `clientUserId` no payload (é assim que sabemos de qual usuário é a atualização).
+  Eventos `transactions/*` só trazem `transactionIds`/`accountId`, sem jeito direto de achar o
+  usuário dono sem uma consulta extra — e tratar isso direito (sem travar a resposta do webhook)
+  pede o job assíncrono do pg-boss (§9), que ainda não existe em lugar nenhum. Na prática, isso
+  não trava nada agora: `item/updated` (que processamos) dispara nos mesmos ciclos de
+  sincronização que trazem transação nova.
+- **API do Pluggy foi implementada a partir da documentação pública (docs.pluggy.ai), sem
+  credencial real pra testar ainda** — dois pontos específicos ficam marcados com comentário em
+  `apps/api/src/lib/pluggy.ts` pra conferir assim que tivermos acesso de verdade: o nome exato do
+  campo de paginação de `GET /accounts` (`results` vs. `data`), e se o sinal do valor em contas
+  tipo `BANK` segue a mesma convenção documentada pra `CREDIT` (positivo = gasto). Pra não depender
+  do sinal (que só está confirmado pra cartão), a importação usa o campo explícito `DEBIT`/`CREDIT`
+  do Pluggy em vez do sinal numérico — mais seguro nos dois casos.
+- **`POST /webhooks/aggregator` não verifica assinatura criptográfica** — o Pluggy não assina o
+  payload do webhook (confirmado na documentação deles). A única verificação possível é um header
+  customizado que a gente mesmo define ao registrar o webhook (`PLUGGY_WEBHOOK_SECRET`,
+  `lib/pluggy.ts` → `registerWebhook`), não uma assinatura HMAC de verdade.
 
 ---
 

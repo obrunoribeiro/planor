@@ -297,7 +297,7 @@ Para cada funcionalidade: objetivo, telas no Figma, regras e casos de borda. Os 
 - A tela "Analisando" mostra o progresso real do processamento (transações importadas, assinaturas encontradas, parcelas e plano). Ela não é apenas uma animação.
 
 ### 6.2 Conexão bancária (Open Finance)
-**Modelo:** usamos um **agregador autorizado** (Pluggy no plano inicial). O Planor não tem licença própria no Banco Central.
+**Modelo:** usamos um **agregador autorizado** — **Pluggy, no plano "Meu Pluggy"** (gratuito, decidido em 2026-10-07 pra reduzir custo no início — ver §15). O Planor não tem licença própria no Banco Central.
 
 **Fluxo técnico:**
 1. O app pede à API um `connectToken` do agregador.
@@ -945,7 +945,9 @@ São os mesmos dados das telas do Figma. Use-os para os mocks e o seed. Os totai
 - Recomendação de investimento específica.
 
 ## 15. Decisões em aberto (confirmar com os sócios)
-1. Qual agregador usar e em qual plano. Pluggy, Belvo e Tecnospeed têm preço, sandbox e limites diferentes, e existe a opção gratuita "Meu Pluggy" para validar.
+1. ~~Qual agregador usar e em qual plano.~~ **Decidido (2026-10-07): Pluggy, plano "Meu Pluggy"
+   (gratuito)**, pra reduzir custo no início — ver §6.2. Reavaliar (Belvo, Tecnospeed, ou um plano
+   pago do próprio Pluggy) quando o volume de usuários justificar.
 2. Limites do plano Grátis. O design atual tem 3 bancos e 10 perguntas; o plano de negócio original falava em 1 banco.
 3. Preços finais: validar com a lista de espera e testes de pagamento.
 4. Nome definitivo e registro da marca no INPI ("Planor" é provisório).

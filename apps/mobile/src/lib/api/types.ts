@@ -109,6 +109,16 @@ export type ImportResultResponse = {
   duplicates: number;
 };
 
+export type ConnectionListItem = {
+  id: string;
+  status: 'connected' | 'error' | 'disconnected' | 'consent_expired';
+  consentExpiresAt: string | null;
+  lastSyncAt: string | null;
+  errorCode: string | null;
+  institutionName: string;
+  institutionLogo: string | null;
+};
+
 export type TransactionListItem = {
   id: string;
   postedAt: string;

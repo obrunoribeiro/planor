@@ -4,6 +4,7 @@ import { apiFetch, apiUpload } from './client';
 import type {
   AccountListItem,
   CategoryListItem,
+  ConnectionListItem,
   FutureTimelineResponse,
   HomeResponse,
   ImportResultResponse,
@@ -178,6 +179,40 @@ export function useImportOfxMutation() {
       return apiUpload<ImportResultResponse>('/imports', { accessToken: accessToken!, formData });
     },
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    },
+  });
+}
+
+export function useConnectionsQuery() {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['connections'],
+    queryFn: () => apiFetch<ConnectionListItem[]>('/connections', { accessToken: accessToken! }),
+    enabled: !!accessToken,
+  });
+}
+
+export function useCreateConnectTokenMutation() {
+  const accessToken = useAccessToken();
+  return useMutation({
+    mutationFn: () => apiFetch<{ accessToken: string }>('/connections/token', { method: 'POST', accessToken: accessToken!, body: '{}' }),
+  });
+}
+
+export function useSyncConnectionItemMutation() {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (itemId: string) =>
+      apiFetch<{ connectionId: string; accountsSynced: number; transactionsImported: number }>('/connections/sync-item', {
+        method: 'POST',
+        accessToken: accessToken!,
+        body: JSON.stringify({ itemId }),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['connections'] });
+      void queryClient.invalidateQueries({ queryKey: ['accounts'] });
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },
   });

@@ -17,6 +17,8 @@ const envSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   PLUGGY_CLIENT_ID: z.string().optional(),
   PLUGGY_CLIENT_SECRET: z.string().optional(),
+  PLUGGY_WEBHOOK_SECRET: z.string().optional(),
+  PLUGGY_WEBHOOK_BASE_URL: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   REVENUECAT_API_KEY: z.string().optional(),
   SENTRY_DSN: z.string().optional(),

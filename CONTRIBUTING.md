@@ -91,6 +91,37 @@ Isso cobre qualquer IP/porta que o Expo Go usar. Quando o app ganhar um build de
 de verdade (EAS dev client) em vez do Expo Go, o redirecionamento passa a ser fixo
 (`planor://**`) — pode adicionar esse também desde já, não tem custo.
 
+### Open Finance (Pluggy) em desenvolvimento
+
+O Planor usa o Pluggy (plano "Meu Pluggy", gratuito — CONTEXTO.md §6.2) pra conectar bancos de
+verdade. Pra testar local:
+
+1. **Credenciais:** crie uma conta em [meu.pluggy.ai](https://meu.pluggy.ai) conectando um banco
+   seu (é o que dá acesso ao "demo application"), depois pegue o Client ID/Secret no
+   [Pluggy Dashboard](https://dashboard.pluggy.ai). Cole em `PLUGGY_CLIENT_ID` e
+   `PLUGGY_CLIENT_SECRET` no `.env` — são compartilhados entre vocês dois, igual o resto do
+   `.env` (não são por-pessoa, ao contrário do `EXPO_PUBLIC_API_URL`).
+2. **Túnel público pro webhook:** o Pluggy precisa alcançar `/webhooks/aggregator` de fora da
+   rede local. Com a API rodando (`pnpm --filter @planor/api dev`), em outro terminal:
+   ```bash
+   ngrok http 3333
+   ```
+   Copia a URL `https://....ngrok-free.app` e coloca em `PLUGGY_WEBHOOK_BASE_URL` no `.env`.
+3. **Registrar o webhook** (precisa repetir toda vez que a URL do ngrok mudar — plano grátis do
+   ngrok muda a cada reinício, igual o IP do Expo Go):
+   ```bash
+   pnpm --filter @planor/api pluggy:register-webhook
+   ```
+4. **Testar sem banco de verdade:** o widget usa `includeSandbox` em dev, que mostra o conector
+   de testes "Pluggy Bank". Login: usuário `user-ok`, senha `password-ok` (MFA, se pedir:
+   `123456`). Outros usuários de teste simulam erro/conta bloqueada/etc. — ver
+   `apps/api/src/lib/pluggy.ts`.
+
+Sem o túnel rodando e o webhook registrado, conectar um banco ainda funciona (o app sincroniza na
+hora via `POST /connections/sync-item`, chamado assim que o widget fecha com sucesso) — só a
+**atualização automática depois** (webhook chegando sozinho quando o banco manda nova transação)
+que não vai funcionar sem isso.
+
 ### ⚠️ `pnpm db:seed` é destrutivo e compartilhado
 
 Esse comando **apaga e recria todas as tabelas de dados do produto** no banco — que é o mesmo
