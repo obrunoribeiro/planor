@@ -7,7 +7,7 @@ import { env } from '../env';
 import { requireUserId } from '../lib/auth';
 import { db } from '../lib/db';
 import { createConnectToken, deleteItem } from '../lib/pluggy';
-import { syncItem } from '../lib/pluggySync';
+import { PluggyOwnershipError, syncItem } from '../lib/pluggySync';
 import { notImplemented } from '../lib/stub';
 
 type PluggyWebhookPayload = {
@@ -56,6 +56,10 @@ export async function connectionRoutes(app: FastifyInstance) {
     try {
       return await syncItem(userId, itemId);
     } catch (err) {
+      if (err instanceof PluggyOwnershipError) {
+        app.log.warn({ err, userId, itemId }, 'tentativa de sincronizar item que não pertence a este usuário');
+        return reply.code(403).send({ error: 'item_not_owned' });
+      }
       app.log.error(err, 'falha ao sincronizar item recém-conectado do Pluggy');
       return reply.code(502).send({ error: 'pluggy_unavailable' });
     }
@@ -91,6 +95,10 @@ export async function connectionRoutes(app: FastifyInstance) {
     try {
       return await syncItem(userId, connection.aggregatorItemId);
     } catch (err) {
+      if (err instanceof PluggyOwnershipError) {
+        app.log.error({ err, userId, connectionId: id }, 'conexão já verificada como do usuário, mas syncItem recusou — investigar');
+        return reply.code(403).send({ error: 'item_not_owned' });
+      }
       app.log.error(err, 'falha ao sincronizar conexão manualmente');
       return reply.code(502).send({ error: 'pluggy_unavailable' });
     }

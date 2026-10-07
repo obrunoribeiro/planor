@@ -52,6 +52,10 @@ export type PluggyItem = {
   executionStatus: string;
   consentExpiresAt?: string;
   error?: { code: string; message: string } | null;
+  /** O `clientUserId` que a gente passou ao criar o connect token — é o que garante, do lado do
+   * Pluggy, de quem é esse item (ver `pluggySync.ts`, que recusa sincronizar se não bater com
+   * quem está pedindo). */
+  clientUserId?: string | null;
 };
 
 /** `itemId` presente = modo "atualizar conexão existente" do widget (ex.: renovar consentimento

@@ -10,6 +10,10 @@ import { getItem, listAccounts, listTransactions, type PluggyAccount, type Plugg
 
 type ConnectionStatus = (typeof connectionStatusEnum.enumValues)[number];
 
+/** Lançado quando o item do Pluggy não pertence a `userId` — nunca deixar passar em silêncio:
+ * seria um usuário vendo (ou escrevendo por cima d)o banco de outra pessoa. */
+export class PluggyOwnershipError extends Error {}
+
 function mapAccountType(account: PluggyAccount): 'checking' | 'savings' | 'credit_card' {
   if (account.type === 'CREDIT') return 'credit_card';
   return account.subtype === 'SAVINGS_ACCOUNT' ? 'savings' : 'checking';
@@ -42,6 +46,24 @@ async function upsertInstitution(connector: PluggyItem['connector']) {
  * (índices únicos em `aggregator_item_id`, `external_id` e `(account_id, external_id)`). */
 export async function syncItem(userId: string, itemId: string): Promise<{ connectionId: string; accountsSynced: number; transactionsImported: number }> {
   const item = await getItem(itemId);
+
+  // `clientUserId` é o que a gente mesmo definiu ao criar o connect token (ver `/connections/token`
+  // em routes/connections.ts) — o Pluggy devolve de volta no item, e é a prova de que esse item
+  // foi aberto por este usuário. Sem isso batendo, não sincroniza de jeito nenhum: um `itemId`
+  // de outra pessoa (adivinhado, vazado, ou só um ID antigo) nunca pode gravar dados bancários
+  // de alguém na conta de outro usuário.
+  if (item.clientUserId !== userId) {
+    throw new PluggyOwnershipError(`Item ${itemId} não pertence ao usuário ${userId}.`);
+  }
+
+  // Segunda trava, redundante de propósito: se esse item já tem uma `connections` registrada
+  // pra outro usuário no nosso banco, recusa mesmo que o `clientUserId` acima (por algum motivo)
+  // tivesse batido.
+  const [existingForAnyUser] = await db.select().from(connections).where(eq(connections.aggregatorItemId, item.id));
+  if (existingForAnyUser && existingForAnyUser.userId !== userId) {
+    throw new PluggyOwnershipError(`Item ${itemId} já está associado a outro usuário.`);
+  }
+
   const institution = await upsertInstitution(item.connector);
 
   const [existingConnection] = await db.select().from(connections).where(eq(connections.aggregatorItemId, item.id));

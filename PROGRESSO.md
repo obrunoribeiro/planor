@@ -126,6 +126,19 @@ protótipo do Figma.
   pra outro usuário (Ana, por exemplo) conectar o banco dele pelo Planor com essas credenciais.
   Validar com os sócios se isso é aceitável pro beta fechado ou se precisa de um plano de
   desenvolvedor de verdade antes de abrir pra mais gente (ver CONTEXTO.md §15.1).
+- **Falha de autorização encontrada e corrigida em `syncItem`** (`pluggySync.ts`) — depois de
+  conectar o banco de verdade, foi feita uma auditoria completa (a pedido do Bruno) de toda rota
+  que toca dado financeiro. `POST /connections/sync-item` recebia o `itemId` do Pluggy direto do
+  corpo da requisição, sem conferir se esse item pertencia mesmo a quem estava chamando — um
+  usuário malicioso que soubesse (ou adivinhasse) o `itemId` de outra pessoa podia, em teoria,
+  fazer os dados bancários dela aparecerem associados à própria conta dele. Corrigido com duas
+  travas em `syncItem` (que agora protege TODOS os caminhos que sincronizam, não só essa rota):
+  confere o `clientUserId` que o próprio Pluggy devolve no item contra quem está pedindo, e
+  confere de novo contra o dono já registrado no nosso banco, se houver. Testado dos dois lados
+  (dono de verdade sincroniza normalmente; usuário errado é recusado com 403). Resto da API
+  (`/transactions`, `/accounts`, `/categories`, `/me`, `/settings`, `/connections`, `/imports`)
+  auditado na mesma passada — todas as rotas que devolvem ou alteram dado já filtravam por
+  `userId` corretamente; essa foi a única falha encontrada.
 
 **Falta:**
 - Login com Apple — precisa do Apple Developer Program (US$99/ano), que ainda não existe.
