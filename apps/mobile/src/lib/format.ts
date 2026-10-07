@@ -38,3 +38,21 @@ export function dueDayMonthLabel(dateKey: string): string {
 export function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
+
+function todaySaoPauloDateKey(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+}
+
+/** "2026-10-04" → "Hoje" / "Ontem" / "4 de outubro" (cabeçalho de grupo em Transações). */
+export function dayGroupLabel(dateKey: string): string {
+  if (dateKey === todaySaoPauloDateKey()) return 'Hoje';
+
+  const year = Number(dateKey.slice(0, 4));
+  const month = Number(dateKey.slice(5, 7));
+  const day = Number(dateKey.slice(8, 10));
+  const yesterday = new Date(Date.UTC(year, month - 1, day - 1));
+  const yesterdayKey = `${yesterday.getUTCFullYear()}-${String(yesterday.getUTCMonth() + 1).padStart(2, '0')}-${String(yesterday.getUTCDate()).padStart(2, '0')}`;
+  if (dateKey === yesterdayKey) return 'Ontem';
+
+  return `${day} de ${monthNamePtBR(`${year}-${String(month).padStart(2, '0')}`)}`;
+}

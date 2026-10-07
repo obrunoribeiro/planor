@@ -89,3 +89,59 @@ export type SettingsResponse = {
   quietHoursEnd: string | null;
   useAnonymizedData: boolean;
 };
+
+export type CategoryListItem = {
+  id: string;
+  name: string;
+  kind: 'fixed' | 'variable';
+  includeInAnalysis: boolean;
+};
+
+export type AccountListItem = {
+  id: string;
+  name: string;
+  type: 'checking' | 'savings' | 'credit_card';
+};
+
+export type TransactionListItem = {
+  id: string;
+  postedAt: string;
+  /** Dia em America/Sao_Paulo, ex.: "2026-10-04" — já vem pronto do backend pra agrupar a lista. */
+  postedAtDateKey: string;
+  descriptionRaw: string;
+  merchantName: string | null;
+  amountCents: number;
+  categoryId: string | null;
+  categoryName: string | null;
+  expenseKind: 'fixed' | 'variable' | null;
+  isHidden: boolean;
+  isInstallment: boolean;
+  accountName: string | null;
+};
+
+export type TransactionDetailResponse = {
+  id: string;
+  postedAt: string;
+  descriptionRaw: string;
+  merchantName: string | null;
+  amountCents: number;
+  categoryId: string | null;
+  categoryName: string | null;
+  categorySource: 'user_rule' | 'global_rule' | 'ai' | 'manual' | null;
+  expenseKind: 'fixed' | 'variable' | null;
+  isHidden: boolean;
+  isInstallment: boolean;
+  note: string | null;
+  accountName: string | null;
+  statement: { period: string; dueDate: string | null } | null;
+};
+
+export type TransactionListFilters = {
+  month?: string;
+  type?: 'todas' | 'saidas' | 'entradas' | 'parcelas';
+  q?: string;
+  accountIds?: string[];
+  categoryIds?: string[];
+  minCents?: number;
+  maxCents?: number;
+};

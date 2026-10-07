@@ -39,3 +39,17 @@ export function monthNamePtBR(monthKey: string): string {
   const month = Number(monthKey.slice(5, 7));
   return MONTH_NAMES_PT_BR[month - 1] ?? monthKey;
 }
+
+/**
+ * Intervalo [início, fim) do mês "YYYY-MM" em America/Sao_Paulo, como instantes UTC — pra
+ * filtrar colunas `timestamptz` (ex.: `transactions.posted_at`) pelo mês local certo (CLAUDE.md,
+ * princípio 5). Fixo em UTC-03:00: o Brasil aboliu o horário de verão em 2019.
+ */
+export function monthRangeSaoPaulo(monthKey: string): { start: Date; end: Date } {
+  const year = Number(monthKey.slice(0, 4));
+  const month = Number(monthKey.slice(5, 7));
+  return {
+    start: new Date(Date.UTC(year, month - 1, 1, 3, 0, 0)),
+    end: new Date(Date.UTC(year, month, 1, 3, 0, 0)),
+  };
+}

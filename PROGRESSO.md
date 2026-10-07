@@ -69,9 +69,29 @@ protótipo do Figma.
   `apps/mobile/src/lib/auth/AuthProvider.tsx`) — Supabase gerencia o fluxo OAuth inteiro (client
   Web no Google Cloud, sem precisar de package Android/bundle iOS ainda); o app abre o navegador
   do sistema (`expo-web-browser` + `expo-auth-session`) e recebe a sessão de volta pelo deep link.
-  Botão real em "Criar conta". **Ainda falta testar ponta a ponta no celular** — pelo Expo Go, a
-  URL de redirecionamento inclui o IP da máquina e precisa ser adicionada à allowlist de Redirect
-  URLs do Supabase manualmente a cada rede nova (ver `CONTRIBUTING.md`, "Login com Google no Expo Go").
+  Botão real em "Criar conta". **Testado no celular e confirmado que o Expo Go não serve pra esse
+  fluxo** — a sessão sempre cancela com `ASWebAuthenticationSessionErrorCode.canceledLogin` depois
+  de escolher a conta no Google (limitação documentada do próprio Expo: custom URL schemes de
+  OAuth não funcionam de forma confiável no Expo Go). Precisa de um **build de desenvolvimento**
+  (`expo-dev-client`, já instalado como dependência) pra validar de verdade — em andamento,
+  bloqueado por instalar o Xcode completo (só as Command Line Tools estavam presentes).
+  `AuthProvider.tsx` tem logs de diagnóstico temporários (`console.log('[google-auth]...`) que
+  devem sair assim que o fluxo for validado pelo build de desenvolvimento.
+- **Transações (lista) e Detalhe da transação construídas com dado real** — essas telas nunca
+  tinham sido feitas, nem com mock, apesar do `PROGRESSO.md` antigo marcar a Fase 1 como completa
+  (havia um TODO no código confirmando isso: `gastos.tsx`, "próxima da Fase 1"). Novo:
+  - `GET /categories`, `GET /accounts` (leitura simples, independentes do Pluggy/`connections.ts`);
+  - `GET /transactions` (filtros: mês, tipo, busca por nome/valor, contas, categorias, faixa de
+    valor) e `GET /transactions/:id`, ambos com dado real (`apps/api/src/routes/transactions.ts`);
+  - `PATCH /transactions/:id` (categoria, tipo de gasto, ocultar, nota) e `POST /category-rules`
+    ("Mudar categoria" → "Aplicar a compras parecidas" cria uma regra pra próximas transações do
+    mesmo comerciante — **não reclassifica as já existentes agora**, só o que a frase do
+    CONTEXTO.md §6.5 pede ao pé da letra);
+  - telas novas `apps/mobile/app/gastos/transacoes.tsx` e `apps/mobile/app/gastos/transacao/[id].tsx`,
+    com as 4 sheets/estados do §6.5 que fazem sentido sem Pluggy/Fase 3/Fase 5 (ver "Decisões
+    diferentes" abaixo pro que ficou de fora).
+  - `monthRangeSaoPaulo` novo em `packages/shared/src/dates.ts` (com teste), pra filtrar
+    `postedAt` pelo mês certo em America/Sao_Paulo (CLAUDE.md, princípio 5).
 
 **Falta:**
 - Login com Apple — precisa do Apple Developer Program (US$99/ano), que ainda não existe.
@@ -80,8 +100,14 @@ protótipo do Figma.
 - Pluggy (Open Finance) — nada implementado ainda. `apps/api/src/routes/connections.ts` é só
   stub. Precisa de túnel público (ngrok ou deploy) pra testar o webhook, já que o agregador
   precisa alcançar a API de fora da rede local.
-- Pipeline de normalização e categorização automática por regras — não existe. Hoje a
-  categorização que aparece é só a do seed; não há nada processando transação nova.
+- Pipeline de normalização e categorização **automática** por regras (dicionário global de
+  comerciantes/palavras-chave, CONTEXTO.md §6.3 passo 2.2) — ainda não existe. A categorização
+  manual (via "Mudar categoria") já é real (ver acima); o que falta é rodar automaticamente em
+  transação nova. Sem Pluggy nem Importar fatura, não existe ainda uma entrada de transação nova
+  pra essa automação processar — faz mais sentido junto de um desses dois.
+- Detalhe da categoria (`GET /spending/category/:id`, gráfico dos últimos 6 meses) — adiado de
+  propósito: só existe um mês semeado (`2026-10`), então o gráfico de 6 meses não tem dado real
+  pra mostrar ainda (mesmo motivo já registrado abaixo pra "tendência vs. mês anterior").
 - Importar fatura (PDF/OFX) — não começou.
 - IA (`apps/mobile/app/(tabs)/ia.tsx`) continua 100% mockada — não é uma lacuna de "dados reais"
   como as outras, é que a função em si (chat com function calling) é escopo da Fase 3.
@@ -116,6 +142,15 @@ protótipo do Figma.
   `RevealScrollView`, em `packages/ui`)** — não é algo que o CONTEXTO.md pede; foi um pedido
   direto do Bruno durante o desenvolvimento (gráficos abaixo da dobra devem animar só quando o
   scroll chega neles, uma vez por visita à tela, não a cada vez que rola pra cima/baixo).
+- **Detalhe da transação não tem "Marcar como recorrente", contexto da IA, "Despesa da casa" nem
+  "Dividir com amigos"** (todos citados no CONTEXTO.md §6.5) — os dois primeiros depende do motor
+  de recorrência/IA da Fase 3; os dois últimos de casa/amigos, que são Fase 5 e ainda mock no
+  Perfil. Incluir qualquer um deles agora seria ou texto fabricado (iria contra o princípio "a IA
+  nunca faz conta") ou uma tela sem backend nenhum por trás. Ficam pra quando a fase correspondente
+  chegar.
+- **Buscas recentes** (CONTEXTO.md §6.5, busca de Transações) não foi implementado — a busca por
+  nome/valor funciona, só não guarda histórico de buscas. Corte de escopo por tempo, não por
+  dependência de outra fase; pode entrar numa iteração futura sem mexer em mais nada.
 
 ---
 

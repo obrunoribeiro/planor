@@ -2,6 +2,7 @@
 import { Badge, Chip, colors, Donut, EmptyState, gradients, GlowOrb, Icon, ProgressBar, RevealScrollView, Sheet, Skeleton, space, typography } from '@planor/ui';
 import { formatCents } from '@planor/shared';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { CategoryRow } from '@/features/gastos/CategoryRow';
@@ -152,8 +153,7 @@ export default function GastosScreen() {
             </View>
           )}
 
-          {/* TODO: navegar pra /gastos/transacoes quando essa tela existir (próxima da Fase 1). */}
-          <Pressable style={styles.secondaryButton}>
+          <Pressable style={styles.secondaryButton} onPress={() => router.push('/gastos/transacoes')}>
             <Text style={styles.secondaryButtonLabel}>Ver todas as transações</Text>
           </Pressable>
         </RevealScrollView>
