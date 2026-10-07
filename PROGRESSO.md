@@ -65,12 +65,16 @@ protótipo do Figma.
   controlando a sessão livremente depois disso. Os outros itens de Segurança do CONTEXTO.md §6.10
   (biometria, bloqueio automático, trocar e-mail, aparelhos conectados) **não** estão nessa sheet
   ainda — ficam para quando tiverem sua própria implementação.
+- **Login com Google implementado** (`AuthProvider.signInWithGoogle`, em
+  `apps/mobile/src/lib/auth/AuthProvider.tsx`) — Supabase gerencia o fluxo OAuth inteiro (client
+  Web no Google Cloud, sem precisar de package Android/bundle iOS ainda); o app abre o navegador
+  do sistema (`expo-web-browser` + `expo-auth-session`) e recebe a sessão de volta pelo deep link.
+  Botão real em "Criar conta". **Ainda falta testar ponta a ponta no celular** — pelo Expo Go, a
+  URL de redirecionamento inclui o IP da máquina e precisa ser adicionada à allowlist de Redirect
+  URLs do Supabase manualmente a cada rede nova (ver `CONTRIBUTING.md`, "Login com Google no Expo Go").
 
 **Falta:**
 - Login com Apple — precisa do Apple Developer Program (US$99/ano), que ainda não existe.
-- Login com Google — precisa de um OAuth Client novo no Google Cloud **específico deste projeto
-  Supabase** (cada projeto tem sua própria URL de callback; um client de outro app/projeto não
-  serve, mesmo que seja do mesmo dono).
 - Segurança: biometria, bloqueio automático ao sair do app, trocar e-mail e aparelhos conectados
   — só "Ocultar valores ao abrir" é real por enquanto (ver acima).
 - Pluggy (Open Finance) — nada implementado ainda. `apps/api/src/routes/connections.ts` é só

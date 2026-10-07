@@ -8,10 +8,11 @@ import { KeyboardDismissView } from '@/components/KeyboardDismissView';
 import { useAuth } from '@/lib/auth/AuthProvider';
 
 export default function CreateAccountScreen() {
-  const { signInWithOtp } = useAuth();
+  const { signInWithOtp, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const onSubmitEmail = async () => {
     setError(undefined);
@@ -27,6 +28,15 @@ export default function CreateAccountScreen() {
       return;
     }
     router.push({ pathname: '/verify-code', params: { email: email.trim().toLowerCase() } });
+  };
+
+  const onPressGoogle = async () => {
+    setError(undefined);
+    setGoogleLoading(true);
+    const { error: authError } = await signInWithGoogle();
+    setGoogleLoading(false);
+    if (authError) setError(authError);
+    // Sucesso: o AuthGate do _layout raiz detecta a sessão nova e navega pra Home sozinho.
   };
 
   return (
@@ -45,13 +55,13 @@ export default function CreateAccountScreen() {
           </View>
 
           <View style={styles.socialButtons}>
-            {/* TODO: Apple/Google exigem credenciais nativas (Apple Developer, Google Cloud) que
-                ainda não existem — ver CONTEXTO.md §15. Por enquanto só o e-mail funciona de verdade. */}
-            <Pressable style={styles.appleButton}>
+            {/* TODO: Apple exige o Apple Developer Program (US$99/ano), que ainda não existe —
+                ver PROGRESSO.md. Fica desabilitado até isso existir. */}
+            <Pressable style={[styles.appleButton, styles.disabledButton]} disabled>
               <Text style={styles.appleButtonLabel}>Continuar com Apple</Text>
             </Pressable>
-            <Pressable style={styles.googleButton}>
-              <Text style={styles.googleButtonLabel}>Continuar com Google</Text>
+            <Pressable style={styles.googleButton} onPress={onPressGoogle} disabled={googleLoading}>
+              <Text style={styles.googleButtonLabel}>{googleLoading ? 'Entrando…' : 'Continuar com Google'}</Text>
             </Pressable>
           </View>
 
@@ -115,6 +125,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     backgroundColor: '#FFFFFF',
   },
+  disabledButton: { opacity: 0.4 },
   appleButtonLabel: {
     fontFamily: typography.labelLarge.fontFamily,
     fontSize: typography.labelLarge.fontSize,
