@@ -1,10 +1,11 @@
 // Transações, regras de categoria e resumo de gastos — CONTEXTO.md §6.3, §6.5, §8.
 import { and, desc, eq, gte, ilike, inArray, isNotNull, lt, or } from 'drizzle-orm';
 import { accounts, cardStatements, categories, categoryRules, monthlySummaries, transactions } from '@planor/db';
-import { monthRangeSaoPaulo } from '@planor/shared';
+import { monthRangeSaoPaulo, previousMonthKey, trendVsPreviousPct } from '@planor/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireUserId } from '../lib/auth';
+import { enqueueProcessTransactions } from '../jobs/queue';
 import { db } from '../lib/db';
 
 function currentMonthSaoPaulo(): string {
@@ -204,6 +205,8 @@ export async function transactionRoutes(app: FastifyInstance) {
       .returning();
 
     if (!updated) return reply.code(404).send({ error: 'transaction_not_found' });
+    // Categoria, tipo e "ocultar" mudam os totais do mês — recalcula em segundo plano.
+    await enqueueProcessTransactions(userId);
     return updated;
   });
 
@@ -221,6 +224,10 @@ export async function transactionRoutes(app: FastifyInstance) {
       .values({ userId, ...parsed.data })
       .returning();
 
+    // "Aplicar a compras parecidas" (§6.5): o pipeline aplica a regra nova às transações que já
+    // existem também (menos as que o usuário categorizou à mão).
+    await enqueueProcessTransactions(userId);
+
     return reply.code(201).send(created);
   });
 
@@ -236,7 +243,11 @@ export async function transactionRoutes(app: FastifyInstance) {
     const [summary] = await db
       .select()
       .from(monthlySummaries)
-      .where(eq(monthlySummaries.userId, userId));
+      .where(and(eq(monthlySummaries.userId, userId), eq(monthlySummaries.month, month)));
+    const [previous] = await db
+      .select({ spentCents: monthlySummaries.spentCents })
+      .from(monthlySummaries)
+      .where(and(eq(monthlySummaries.userId, userId), eq(monthlySummaries.month, previousMonthKey(month))));
 
     const byCategory = (summary?.byCategory as Record<string, number> | undefined) ?? {};
     const categoryIds = Object.keys(byCategory);
@@ -262,10 +273,10 @@ export async function transactionRoutes(app: FastifyInstance) {
       .sort((a, b) => b.amountCents - a.amountCents);
 
     return {
-      month: summary?.month ?? month,
+      month,
       totalCents,
       categoriesCount: categoryList.length,
-      trendVsLastMonthPct: null,
+      trendVsLastMonthPct: trendVsPreviousPct(totalCents, previous?.spentCents),
       fixedCents: summary?.fixedCents ?? 0,
       variableCents: summary?.variableCents ?? 0,
       fixedPct: summary && summary.fixedCents + summary.variableCents > 0

@@ -40,7 +40,11 @@ function GastoDoMesCard({ spendingThisMonth, monthLabel }: { spendingThisMonth: 
             <Text style={styles.label}>Gasto em {monthLabel}</Text>
             <Money style={styles.amount} cents={spendingThisMonth.amountCents} />
             {spendingThisMonth.trendVsLastMonthPct !== null && (
-              <Text style={styles.trendNegative}>+{spendingThisMonth.trendVsLastMonthPct}% que o mês anterior</Text>
+              // Gastar mais que o mês anterior é ruim (vermelho); menos, bom (verde).
+              <Text style={spendingThisMonth.trendVsLastMonthPct > 0 ? styles.trendNegative : styles.trendPositive}>
+                {spendingThisMonth.trendVsLastMonthPct > 0 ? '+' : ''}
+                {spendingThisMonth.trendVsLastMonthPct}% que o mês anterior
+              </Text>
             )}
           </View>
         </>
@@ -228,6 +232,12 @@ const styles = StyleSheet.create({
     fontFamily: typography.labelMedium.fontFamily,
     fontSize: 13,
     color: colors.dark.text.tertiary,
+  },
+  trendPositive: {
+    fontFamily: typography.caption.fontFamily,
+    fontSize: typography.caption.fontSize,
+    letterSpacing: typography.caption.letterSpacing,
+    color: colors.dark.text.success,
   },
   trendNegative: {
     fontFamily: typography.caption.fontFamily,

@@ -122,6 +122,22 @@ hora via `POST /connections/sync-item`, chamado assim que o widget fecha com suc
 **atualização automática depois** (webhook chegando sozinho quando o banco manda nova transação)
 que não vai funcionar sem isso.
 
+### Fila de jobs (pg-boss) e pipeline de transações
+
+A API sobe junto os workers do pg-boss (`apps/api/src/jobs/`) — não tem processo separado pra
+rodar. O pg-boss guarda a fila no próprio Postgres (schema `pgboss`), então **a fila também é
+compartilhada**: se vocês dois estiverem com a API rodando ao mesmo tempo, qualquer um dos dois
+workers pode pegar um job do outro — e processar com o código da branch de quem pegou. Se estiver
+mexendo no pipeline (`packages/shared/src/pipeline/`, `apps/api/src/services/processTransactions.ts`),
+avise a outra pessoa ou rode o pipeline direto, sem fila:
+
+```bash
+pnpm --filter @planor/api pipeline:reprocess seu@email.com   # um usuário
+pnpm --filter @planor/api pipeline:reprocess --all           # todo mundo
+```
+
+É idempotente — pode rodar quantas vezes quiser (ex.: depois de mexer no dicionário de regras).
+
 ### ⚠️ `pnpm db:seed` é destrutivo e compartilhado
 
 Esse comando **apaga e recria todas as tabelas de dados do produto** no banco — que é o mesmo

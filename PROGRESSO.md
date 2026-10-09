@@ -9,7 +9,7 @@
 > **Regra (ver `CLAUDE.md`, Regra Nº 2): atualize este arquivo no mesmo commit que fecha ou avança
 > uma fase**, antes de abrir o PR — não depois.
 
-Última atualização: 2026-10-07.
+Última atualização: 2026-10-08.
 
 ---
 
@@ -19,7 +19,7 @@
 |---|---|
 | 0 — Base | 🟡 quase completa (falta Sentry/PostHog) |
 | 1 — Interface com dados fictícios | ✅ completa |
-| 2 — Conta e dados reais | 🟡 em andamento |
+| 2 — Conta e dados reais | 🟡 em andamento (falta Apple, PDF, Contas e cartões, jobs agendados) |
 | 3 — Inteligência | ⬜ não iniciada |
 | 4 — Monetização | ⬜ não iniciada |
 | 5 — Juntos e crescimento | ⬜ não iniciada |
@@ -140,6 +140,37 @@ protótipo do Figma.
   auditado na mesma passada — todas as rotas que devolvem ou alteram dado já filtravam por
   `userId` corretamente; essa foi a única falha encontrada.
 
+- **Pipeline de processamento + fila pg-boss** (CONTEXTO.md §6.3 passos 1, 2 e 9; §9) — Home e
+  Gastos agora mostram o dinheiro real, não mais o agregado fixo do seed:
+  - Regras puras em `packages/shared/src/pipeline/` (com teste): `normalizeMerchantName` (tira
+    prefixo de intermediador tipo `Ebn *`/`Mp *`/`Ifd*`, sufixo de parcela `3/10`, contraparte do
+    Pix depois do `|`), `categorizeTransaction` (regras do usuário → dicionário global
+    `GLOBAL_CATEGORY_RULES`, por palavra inteira, ordem importa), `isCardBillPayment`
+    (pagamento de fatura nos dois lados + "Saldo em atraso/rotativo" viram `isTransfer`) e
+    `buildMonthlySummaries` / `trendVsPreviousPct`.
+  - `apps/api/src/services/processTransactions.ts` aplica isso no banco (UPDATE em lote) e
+    regrava `monthly_summaries` de todos os meses até hoje. Idempotente (segunda passada: 0
+    linhas). Nunca sobrescreve categoria `manual`/`ai` nem `expenseKind` já preenchido.
+  - pg-boss configurado (`apps/api/src/jobs/`), workers rodando no mesmo processo da API, schema
+    `pgboss` criado no Supabase. Funciona pelo pooler (porta 6543). Filas `sync-connection` e
+    `process-transactions` (política `stately`, uma por usuário).
+  - Quem enfileira `process-transactions`: fim de todo `syncItem`, `POST /imports`,
+    `PATCH /transactions/:id` e `POST /category-rules`. O webhook do Pluggy agora só enfileira
+    `sync-connection` e responde na hora (§8, "enfileira jobs").
+  - Script `pnpm --filter @planor/api pipeline:reprocess <email>|--all` roda o pipeline sem fila
+    (backfill, ou depois de mexer no dicionário).
+  - Tendência "vs. mês anterior" (Home e Gastos) agora é real — existe mais de um mês. O app
+    mostra verde quando o gasto caiu e vermelho quando subiu (antes era sempre "+" vermelho).
+  - Bug corrigido: `GET /spending/summary` não filtrava por mês (pegava a primeira linha do
+    usuário) — só não aparecia porque só existia um mês.
+  - **Rodado na conta do Bruno em 2026-10-08:** 812 transações atualizadas, 13 meses
+    recalculados (out/2025 a out/2026). Cobertura do dicionário: ~30% das saídas reais ficam
+    categorizadas; o resto cai em "Outros" (maior bloco: "Tiktok", 148 transações, ~R$ 8,8 mil,
+    de propósito sem regra global — ver "Decisões diferentes").
+  - As 8 transações fictícias do seed na conta do Bruno (contas sem `external_id`: Nubank,
+    Nubank Cartão, Itaú, Itaú Cartão) foram marcadas **ocultas** a pedido dele, pra não misturar
+    aluguel/salário inventados com o dado real. Continuam no extrato; reversível.
+
 **Falta:**
 - Login com Apple — precisa do Apple Developer Program (US$99/ano), que ainda não existe.
 - Segurança: biometria, bloqueio automático ao sair do app, trocar e-mail e aparelhos conectados
@@ -147,26 +178,24 @@ protótipo do Figma.
 - Pluggy: validado ponta a ponta (ver "Feito" acima). O que falta em volta disso: tela de lista
   "Contas e cartões" com detalhe de cada conexão (CONTEXTO.md §6.10) — hoje só o contador no card
   do plano usa dado real, a lista propriamente dita continua mock; avisos de consentimento
-  vencendo (7 e 1 dia antes) e a tela "Renovar acesso"; atualização automática a cada 4-6h (job —
-  depende do pg-boss, que também não está configurado em lugar nenhum ainda, só instalado como
-  dependência); fila assíncrona pros eventos `transactions/*` do webhook (hoje só `item/*` é
-  processado — ver "Decisões diferentes"); limpar a conexão duplicada vazia que sobrou dos testes
+  vencendo (7 e 1 dia antes) e a tela "Renovar acesso"; atualização automática a cada 4-6h (job agendado —
+  a fila pg-boss já existe, ver "Feito"); eventos `transactions/*` do webhook (hoje só
+  `item/*` é processado — ver "Decisões diferentes"); limpar a conexão duplicada vazia que sobrou dos testes
   (sem urgência, é dado de dev).
 - Importar fatura em **PDF** — precisa de extração de texto + LLM pra estruturar em JSON
   validado com zod (CONTEXTO.md §6.2), e o provedor de IA final ainda é decisão em aberto
   (CONTEXTO.md §15.6). `POST /imports` já devolve `501` com uma mensagem clara pra esse caso.
-- Pipeline de normalização e categorização **automática** por regras (dicionário global de
-  comerciantes/palavras-chave, CONTEXTO.md §6.3 passo 2.2) — ainda não existe. A categorização
-  manual (via "Mudar categoria") já é real, e agora tem duas entradas de transação nova pra uma
-  automação processar (Importar fatura OFX e, no futuro, Pluggy) — só falta escrever a automação
-  em si e rodá-la nesse ponto.
-- Recalcular `monthly_summaries` depois de importar — não existe (é o passo 9 do pipeline, que
-  também não existe em lugar nenhum ainda, nem rodou uma vez fora do seed). Na prática: uma fatura
-  importada aparece certinho em Transações, mas **não muda** a sobra da Home nem o resumo de
-  Gastos, que continuam lendo o agregado pré-calculado do seed.
-- Detalhe da categoria (`GET /spending/category/:id`, gráfico dos últimos 6 meses) — adiado de
-  propósito: só existe um mês semeado (`2026-10`), então o gráfico de 6 meses não tem dado real
-  pra mostrar ainda (mesmo motivo já registrado abaixo pra "tendência vs. mês anterior").
+- Pipeline, passo 2.3 (LLM barato pro que as regras não pegam) — depende do provedor de IA
+  (CONTEXTO.md §15.6). Hoje ~70% das saídas reais ficam sem categoria ("Outros").
+- Pipeline, passos 4–8 (parcelas, recorrências, fixo/variável por recorrência, fora do padrão) e
+  o resto do passo 9 (`committed_by_month`, previsão da sobra, plano da semana) — são Fase 3.
+  `committed_by_month`, `recurrences` e `installment_plans` continuam vindo do seed.
+- Jobs agendados do §9: `sync-connection` a cada 4-6h e `consent-expiry-check` (a fila já existe,
+  falta o `boss.schedule`).
+- O app não espera o job terminar: depois de "Mudar categoria"/ocultar/sincronizar, a Home pode
+  mostrar o número antigo por alguns segundos até o próximo refetch.
+- Detalhe da categoria (`GET /spending/category/:id`, gráfico dos últimos 6 meses) — **agora
+  desbloqueado**: `monthly_summaries` tem 13 meses reais com `byCategory`.
 - IA (`apps/mobile/app/(tabs)/ia.tsx`) continua 100% mockada — não é uma lacuna de "dados reais"
   como as outras, é que a função em si (chat com function calling) é escopo da Fase 3.
 - Perfil: o bloco de usuário/plano, o formulário de edição e o toggle de Segurança são reais. Os
@@ -178,13 +207,30 @@ protótipo do Figma.
 
 ## Decisões diferentes do `CONTEXTO.md` original (e por quê)
 
-- **Tendência "vs. mês anterior"** (Home e Gastos) retorna `null` da API em vez de um número — só
-  existe um mês (`2026-10`) semeado em `monthly_summaries`, não tem como comparar sem inventar.
-  As duas telas escondem o badge de tendência quando vem `null`, em vez de mostrar um número fabricado.
-- **`GET /spending/summary` lê de `monthly_summaries`, não soma `transactions` ao vivo** — a
-  amostra de transações do seed é parcial de propósito (o próprio `seed.ts` admite isso no
-  comentário do topo: "não os 14 pedidos citados no §12"), então somar ao vivo dava um total menor
-  que o oficial. `monthly_summaries` é o agregado completo e é o que o `/home` já usava.
+- **Tendência "vs. mês anterior"** (Home e Gastos) continua `null` quando o mês anterior não tem
+  gasto em `monthly_summaries` — nunca inventa número. Com o pipeline rodando, isso só acontece
+  no primeiro mês de dados de um usuário. Atenção: no começo do mês ela compara um mês parcial com
+  um mês inteiro, então tende a vir bem negativa (ex.: dia 8 → "-93%"). Não é bug de conta; se
+  incomodar, a alternativa é comparar com o mesmo dia do mês anterior (decisão de produto).
+- **`GET /spending/summary` lê de `monthly_summaries`, não soma `transactions` ao vivo** — mesmo
+  agregado que o `/home` usa, agora recalculado de verdade pelo pipeline.
+- **Gasto do mês só conta transação com data até hoje** — o Pluggy já devolve as próximas parcelas
+  do cartão com data futura (ex.: "PagTesouro 12/12" em mar/2027). Isso é "comprometido" (Fase 3),
+  não gasto; por isso `monthly_summaries` só vai até o mês atual.
+- **"Saldo em atraso" / "Saldo em rotativo" do cartão viram `isTransfer`** — o CONTEXTO.md não
+  cita isso. É o saldo da fatura anterior levado pra próxima: as compras já contaram no mês em
+  que aconteceram, contar de novo duplicaria (~R$ 3,2 mil na conta do Bruno). Juros e multa de
+  atraso continuam contando como gasto.
+- **Dicionário global é conservador** — só nome inequívoco. "Tiktok" (loja, moedas ou anúncio?),
+  restaurantes/lanchonetes (não existe categoria "Restaurantes" no §6.3, passo 3) e pessoas
+  físicas ficam sem regra global; o usuário corrige com "Mudar categoria" → vira regra dele.
+- **"Aplicar a compras parecidas" agora reclassifica também as transações já existentes** (antes
+  só valia pras próximas). Acontece naturalmente: criar a regra enfileira o pipeline, que aplica a
+  regra a tudo que não foi categorizado à mão. Bate melhor com o texto do §6.5.
+- **Transferência entre contas próprias (Pix pra si mesmo) não é detectada** — só pagamento de
+  fatura. Sem o CPF da contraparte (o Pluggy tem em `paymentData`, mas não guardamos), comparar
+  pelo nome é frágil. Na conta do Bruno, isso faz o Pix que ele recebe do próprio MEI contar como
+  renda (o que é defensável) e os que ele envia pra si mesmo contarem como gasto.
 - **`categories.default_kind` estava bugado no seed** (toda categoria nascia `'variable'`,
   mesmo Moradia/Saúde/Assinaturas). Corrigido pra bater com os números do CONTEXTO.md §12 — não
   é uma decisão de produto, foi um bug mesmo, achado ao validar `/spending/summary`.
@@ -221,11 +267,10 @@ protótipo do Figma.
   automático, acima). Sem isso, vira "Ifood *pizzaria Bella" em vez do nome comercial bonito.
 - **Webhook do Pluggy só processa eventos `item/*`** — segundo a documentação do Pluggy, só esses
   eventos vêm com `clientUserId` no payload (é assim que sabemos de qual usuário é a atualização).
-  Eventos `transactions/*` só trazem `transactionIds`/`accountId`, sem jeito direto de achar o
-  usuário dono sem uma consulta extra — e tratar isso direito (sem travar a resposta do webhook)
-  pede o job assíncrono do pg-boss (§9), que ainda não existe em lugar nenhum. Na prática, isso
-  não trava nada agora: `item/updated` (que processamos) dispara nos mesmos ciclos de
-  sincronização que trazem transação nova.
+  Eventos `transactions/*` só trazem `transactionIds`/`accountId`. A fila (pg-boss) já existe; o
+  que falta é achar o dono pelo `itemId` na tabela `connections` e enfileirar `sync-connection`.
+  Na prática, isso não trava nada agora: `item/updated` (que processamos) dispara nos mesmos
+  ciclos de sincronização que trazem transação nova.
 - **API do Pluggy foi implementada a partir da documentação pública, depois validada contra uma
   conexão real** (ver "Feito" acima) — `GET /accounts` usa mesmo `results` como documentado, mas
   `GET /transactions` estava descontinuado (410) e foi trocado por `GET /v2/transactions` com
