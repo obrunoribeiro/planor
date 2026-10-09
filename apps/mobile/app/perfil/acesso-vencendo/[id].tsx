@@ -8,7 +8,8 @@
 import { Badge, Button, colors, EmptyState, ScreenHeader, Skeleton, space, typography } from '@planor/ui';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
-import { BankAvatar, expiresInLabel, InfoRows, ScreenGlow } from '@/features/contas/shared';
+import { ScreenGlow } from '@/components/ScreenGlow';
+import { BankAvatar, expiresInLabel, InfoRows } from '@/features/contas/shared';
 import { useConnectionsQuery } from '@/lib/api/queries';
 import { longDateFromIso } from '@/lib/format';
 

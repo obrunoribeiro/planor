@@ -146,6 +146,21 @@ export type TransactionListItem = {
   accountName: string | null;
 };
 
+/** `GET /spending/category/:id` — Gastos · Categoria (§6.5). */
+export type CategoryDetailResponse = {
+  category: { id: string; name: string; kind: 'fixed' | 'variable' };
+  month: string;
+  totalCents: number;
+  transactionsCount: number;
+  /** `null` sem nenhuma compra no mês. */
+  averageTicketCents: number | null;
+  /** Últimos 6 meses, do mais antigo pro mês pedido. */
+  months: { month: string; label: string; amountCents: number }[];
+  /** Média só dos meses em que já havia dado (`null` se nenhum). */
+  monthlyAverageCents: number | null;
+  transactions: TransactionListItem[];
+};
+
 export type TransactionDetailResponse = {
   id: string;
   postedAt: string;

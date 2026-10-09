@@ -3,6 +3,7 @@ import { useAuth } from '@/lib/auth/AuthProvider';
 import { apiFetch, apiUpload } from './client';
 import type {
   AccountListItem,
+  CategoryDetailResponse,
   CategoryListItem,
   ConnectionListItem,
   FutureTimelineResponse,
@@ -154,7 +155,17 @@ export function useUpdateTransactionMutation(id: string) {
       queryClient.setQueryData(['transaction', id], updated);
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });
       void queryClient.invalidateQueries({ queryKey: ['spending-summary'] });
+      void queryClient.invalidateQueries({ queryKey: ['category-detail'] });
     },
+  });
+}
+
+export function useCategoryDetailQuery(categoryId: string) {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['category-detail', categoryId],
+    queryFn: () => apiFetch<CategoryDetailResponse>(`/spending/category/${categoryId}`, { accessToken: accessToken! }),
+    enabled: !!accessToken && !!categoryId,
   });
 }
 

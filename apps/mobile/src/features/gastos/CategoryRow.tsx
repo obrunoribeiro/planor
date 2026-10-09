@@ -11,15 +11,15 @@ export type CategoryRowProps = {
   amountCents: number;
   kind: 'Fixo' | 'Variável';
   pctOfTotal: number;
+  onPress?: () => void;
 };
 
-export function CategoryRow({ icon, name, amountCents, kind, pctOfTotal }: CategoryRowProps) {
+export function CategoryRow({ icon, name, amountCents, kind, pctOfTotal, onPress }: CategoryRowProps) {
   const { progress, ref } = useRevealProgress(pctOfTotal);
   const fillStyle = useAnimatedStyle(() => ({ width: `${progress.value}%` }));
 
-  // TODO: navegar pra /gastos/categoria/[id] quando essa tela existir.
   return (
-    <Pressable style={styles.row}>
+    <Pressable style={styles.row} onPress={onPress} accessibilityRole={onPress ? 'button' : undefined}>
       <View style={styles.iconBox}>
         <Icon name={icon} size={20} color={colors.dark.text.primary} />
       </View>

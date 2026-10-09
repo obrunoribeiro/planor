@@ -1,7 +1,7 @@
 // Peças comuns das telas de conexão bancária (Contas e cartões, Conexão, Acesso vencendo,
 // Renovar acesso) — CONTEXTO.md §6.2 e §6.10. Medidas e cores das telas 34:785, 53:1306,
 // 83:2288 e 83:2329 do Figma.
-import { colors, GlowOrb, primitives, radius, space, typography } from '@planor/ui';
+import { colors, primitives, radius, space, typography } from '@planor/ui';
 import { StyleSheet, Text, View } from 'react-native';
 import { institutionInitials } from '@/lib/format';
 import type { ConnectionListItem } from '@/lib/api/types';
@@ -47,25 +47,6 @@ export function InfoRows({ rows }: { rows: { label: string; value: string }[] })
           <Text style={styles.infoValue}>{row.value}</Text>
         </View>
       ))}
-    </View>
-  );
-}
-
-/** "Brilho" no topo das telas internas (520×420 em -60,-120) — roxo por padrão, âmbar quando o
- * assunto é um alerta (tela "Acesso vencendo"). */
-export function ScreenGlow({ tone = 'marca' }: { tone?: 'marca' | 'alerta' }) {
-  return (
-    <View style={styles.glow} pointerEvents="none">
-      <GlowOrb
-        width={520}
-        height={420}
-        color={tone === 'alerta' ? colors.dark.text.alert : primitives.purple[500]}
-        stops={[
-          { offset: 0, opacity: 0.35 },
-          { offset: 0.55, opacity: 0.1225 },
-          { offset: 1, opacity: 0 },
-        ]}
-      />
     </View>
   );
 }
@@ -124,5 +105,4 @@ const styles = StyleSheet.create({
     letterSpacing: typography.labelSmall.letterSpacing,
     color: colors.dark.text.primary,
   },
-  glow: { position: 'absolute', top: -120, left: -60 },
 });

@@ -151,6 +151,7 @@ export default function GastosScreen() {
                   amountCents={category.amountCents}
                   kind={category.kind === 'fixed' ? 'Fixo' : 'Variável'}
                   pctOfTotal={category.pctOfTotal}
+                  onPress={() => router.push(`/gastos/categoria/${category.categoryId}`)}
                 />
               ))}
             </View>

@@ -5,7 +5,8 @@ import { Button, colors, EmptyState, gradients, Icon, Logo, radius, ScreenHeader
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { BankAvatar, ScreenGlow } from '@/features/contas/shared';
+import { ScreenGlow } from '@/components/ScreenGlow';
+import { BankAvatar } from '@/features/contas/shared';
 import { useConnectionsQuery } from '@/lib/api/queries';
 
 const SHARED_DATA: { icon: IconName; title: string; text: string }[] = [
