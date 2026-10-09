@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "pluggy:register-webhook": "tsx src/scripts/register-pluggy-webhook.ts"
+    "pluggy:register-webhook": "tsx src/scripts/register-pluggy-webhook.ts",
+    "pipeline:reprocess": "tsx src/scripts/reprocess-transactions.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",

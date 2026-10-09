@@ -94,7 +94,10 @@ export default function GastosScreen() {
                 <Text style={styles.totalLabel}>Total gasto</Text>
                 <Text style={styles.totalAmount}>{formatCents(data.totalCents)}</Text>
                 {data.trendVsLastMonthPct !== null && (
-                  <Badge tone="error" label={`+${data.trendVsLastMonthPct}% que o mês anterior`} />
+                  <Badge
+                    tone={data.trendVsLastMonthPct > 0 ? 'error' : 'success'}
+                    label={`${data.trendVsLastMonthPct > 0 ? '+' : ''}${data.trendVsLastMonthPct}% que o mês anterior`}
+                  />
                 )}
               </View>
             </View>

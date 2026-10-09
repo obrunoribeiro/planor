@@ -1,10 +1,11 @@
 // Grava no banco o que o Pluggy devolve pra um item (conexão) — usado tanto pelo webhook
 // (`item/created`, `item/updated`, `transactions/*`) quanto pelo "Atualizar agora" manual
-// (CONTEXTO.md §6.2, §6.3 passo 1 — normalização/dedup; passo 9, recalcular agregados, NÃO
-// acontece aqui ainda, ver PROGRESSO.md).
+// (CONTEXTO.md §6.2, §6.3 passo 1 — dedup por id externo). O resto do pipeline (nome do
+// estabelecimento, categoria, agregados) roda depois, no job `process-transactions`.
 import { eq } from 'drizzle-orm';
 import { accounts, connections, creditCards, institutions, transactions } from '@planor/db';
 import type { connectionStatusEnum } from '@planor/db';
+import { enqueueProcessTransactions } from '../jobs/queue';
 import { db } from './db';
 import { getItem, listAccounts, listTransactions, type PluggyAccount, type PluggyItem } from './pluggy';
 
@@ -137,6 +138,9 @@ export async function syncItem(userId: string, itemId: string): Promise<{ connec
       if (inserted) transactionsImported += 1;
     }
   }
+
+  // Sempre, mesmo sem transação nova: o saldo/conta pode ter mudado, e o job é barato e idempotente.
+  await enqueueProcessTransactions(userId);
 
   return { connectionId: connection.id, accountsSynced: pluggyAccounts.length, transactionsImported };
 }

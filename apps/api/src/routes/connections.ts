@@ -6,6 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import { env } from '../env';
 import { requireUserId } from '../lib/auth';
 import { db } from '../lib/db';
+import { enqueueProcessTransactions, enqueueSyncConnection } from '../jobs/queue';
 import { createConnectToken, deleteItem } from '../lib/pluggy';
 import { PluggyOwnershipError, syncItem } from '../lib/pluggySync';
 import { notImplemented } from '../lib/stub';
@@ -132,14 +133,15 @@ export async function connectionRoutes(app: FastifyInstance) {
     const payload = request.body as PluggyWebhookPayload;
     app.log.info({ event: payload?.event, itemId: payload?.itemId }, 'webhook do Pluggy recebido');
 
-    // Só processa eventos item/* (têm itemId + clientUserId no payload). transactions/* e
-    // connector/* não trazem clientUserId — tratar isso direito depende do job assíncrono
-    // (pg-boss, §9) que ainda não existe; por ora só confirma recebido (ver PROGRESSO.md).
+    // Só enfileira (§8: "enfileira jobs") e responde na hora — a sincronização roda no job
+    // `sync-connection`. Só eventos item/* trazem `clientUserId`; transactions/* e connector/*
+    // ainda são só confirmados (ver PROGRESSO.md, "Decisões diferentes").
     if (payload?.itemId && payload.clientUserId && payload.event?.startsWith('item')) {
       try {
-        await syncItem(payload.clientUserId, payload.itemId);
+        await enqueueSyncConnection({ userId: payload.clientUserId, itemId: payload.itemId });
       } catch (err) {
-        app.log.error(err, 'falha ao sincronizar item do Pluggy a partir do webhook');
+        app.log.error(err, 'falha ao enfileirar sincronização do Pluggy a partir do webhook');
+        return reply.code(500).send({ error: 'queue_unavailable' }); // Pluggy tenta de novo
       }
     }
 
@@ -194,6 +196,8 @@ export async function connectionRoutes(app: FastifyInstance) {
         .returning();
       if (inserted) imported += 1;
     }
+
+    if (imported > 0) await enqueueProcessTransactions(userId);
 
     return reply.code(201).send({ total: parsed.length, imported, duplicates: parsed.length - imported });
   });

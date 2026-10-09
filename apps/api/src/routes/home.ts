@@ -15,7 +15,7 @@ import {
   users,
   weeklyPlans,
 } from '@planor/db';
-import { monthAbbrevPtBR, projectedLeftover } from '@planor/shared';
+import { monthAbbrevPtBR, previousMonthKey, projectedLeftover, trendVsPreviousPct } from '@planor/shared';
 import type { FastifyInstance } from 'fastify';
 import { requireUserId } from '../lib/auth';
 import { db } from '../lib/db';
@@ -42,8 +42,7 @@ type WeeklyPlanItem = {
 };
 
 /** Gasto acumulado por dia do mês (saídas, sem ocultas nem transferências) — vira a Sparkline do
- * card "Gasto do mês". Dado real, calculado na hora a partir das transações (não existe mês
- * anterior semeado pra comparar tendência, então isso é só o acumulado deste mês mesmo). */
+ * card "Gasto do mês". Dado real, calculado na hora a partir das transações deste mês. */
 async function dailySpendCumulative(userId: string, month: string): Promise<number[]> {
   const rows = await db
     .select({ postedAt: transactions.postedAt, amountCents: transactions.amountCents })
@@ -93,6 +92,10 @@ export async function homeRoutes(app: FastifyInstance) {
       .select()
       .from(monthlySummaries)
       .where(and(eq(monthlySummaries.userId, userId), eq(monthlySummaries.month, month)));
+    const [previousSummary] = await db
+      .select({ spentCents: monthlySummaries.spentCents })
+      .from(monthlySummaries)
+      .where(and(eq(monthlySummaries.userId, userId), eq(monthlySummaries.month, previousMonthKey(month))));
 
     const monthlyIncomeCents = user.monthlyIncomeCents ?? 0;
     const spentThisMonthCents = summary?.spentCents ?? 0;
@@ -168,7 +171,7 @@ export async function homeRoutes(app: FastifyInstance) {
       },
       spendingThisMonth: {
         amountCents: spentThisMonthCents,
-        trendVsLastMonthPct: null,
+        trendVsLastMonthPct: trendVsPreviousPct(spentThisMonthCents, previousSummary?.spentCents),
         sparkline,
       },
       subscriptions: {
