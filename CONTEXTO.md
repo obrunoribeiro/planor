@@ -248,7 +248,7 @@ app/
 ├─ sobra                 # Como calculamos a sobra
 ├─ plano-semana
 ├─ alertas
-├─ perfil/               # perfil, editar, contas, conexao/[id], meu-plano, assinatura, notificacoes, seguranca, privacidade, ajuda
+├─ perfil/               # perfil, editar, contas, conexao/[id], acesso-vencendo/[id], renovar/[id], meu-plano, assinatura, notificacoes, seguranca, privacidade, ajuda
 ├─ casa/                 # escolher-modo, convidar, compartilhar, convite-enviado, convite/[id], painel, acertar, despesa/[id], config, pessoas-plano
 ├─ amigos/               # feed, desafios, lista, adicionar, [userId], post/[id], acertos
 ├─ meta-grupo/           # criar (2 passos), [id], convite/[id]
