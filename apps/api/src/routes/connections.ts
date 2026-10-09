@@ -6,8 +6,8 @@ import type { FastifyInstance } from 'fastify';
 import { env } from '../env';
 import { requireUserId } from '../lib/auth';
 import { db } from '../lib/db';
-import { enqueueProcessTransactions, enqueueSyncConnection } from '../jobs/queue';
-import { createConnectToken, deleteItem } from '../lib/pluggy';
+import { enqueueProcessTransactions, enqueueSyncConnection, SYNC_READ_DELAY_SECONDS } from '../jobs/queue';
+import { createConnectToken, deleteItem, requestItemRefresh } from '../lib/pluggy';
 import { PluggyOwnershipError, syncItem } from '../lib/pluggySync';
 import { notImplemented } from '../lib/stub';
 
@@ -93,8 +93,21 @@ export async function connectionRoutes(app: FastifyInstance) {
     const [connection] = await db.select().from(connections).where(and(eq(connections.id, id), eq(connections.userId, userId)));
     if (!connection) return reply.code(404).send({ error: 'connection_not_found' });
 
+    // "Atualizar agora" (§6.2): pede dado novo ao banco, devolve na hora o que o Pluggy já tem e
+    // agenda uma segunda leitura pra quando a atualização terminar do lado deles.
+    let refreshRequested = false;
     try {
-      return await syncItem(userId, connection.aggregatorItemId);
+      refreshRequested = (await requestItemRefresh(connection.aggregatorItemId)) === 'requested';
+    } catch (err) {
+      app.log.warn({ err, connectionId: id }, 'Pluggy recusou pedido de atualização — lendo o que já existe');
+    }
+
+    try {
+      const result = await syncItem(userId, connection.aggregatorItemId);
+      if (refreshRequested) {
+        await enqueueSyncConnection({ userId, itemId: connection.aggregatorItemId }, { startAfterSeconds: SYNC_READ_DELAY_SECONDS });
+      }
+      return { ...result, refreshRequested };
     } catch (err) {
       if (err instanceof PluggyOwnershipError) {
         app.log.error({ err, userId, connectionId: id }, 'conexão já verificada como do usuário, mas syncItem recusou — investigar');

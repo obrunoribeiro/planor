@@ -7,3 +7,4 @@ export * from './calculations/householdSettlement';
 export * from './pipeline/normalize';
 export * from './pipeline/categorize';
 export * from './pipeline/monthlySummary';
+export * from './calculations/consentExpiry';

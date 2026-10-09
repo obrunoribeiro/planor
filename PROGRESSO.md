@@ -171,6 +171,29 @@ protótipo do Figma.
     Nubank Cartão, Itaú, Itaú Cartão) foram marcadas **ocultas** a pedido dele, pra não misturar
     aluguel/salário inventados com o dado real. Continuam no extrato; reversível.
 
+- **Jobs agendados das conexões** (CONTEXTO.md §6.2, §6.9, §9) — `apps/api/src/services/connectionJobs.ts`:
+  - `sync-all-connections` a cada 6h (`0 */6 * * *`, America/Sao_Paulo): pede atualização ao
+    Pluggy (`requestItemRefresh`, `PATCH /items/{id}`) e agenda a leitura (`sync-connection`) pra
+    3 min depois — ou na hora, se o Pluggy recusar o pedido (ver "Decisões diferentes": Meu
+    Pluggy não aceita). Não depende do webhook/ngrok.
+  - `consent-expiry-check` diário às 9h: alerta `consent_expiring` nos marcos de 7 e 1 dia
+    (`checkConsent` em `packages/shared/src/calculations/consentExpiry.ts`, com teste — por janela,
+    então se o job perder o dia exato o aviso sai no dia seguinte), sem duplicar e "zerando"
+    quando o acesso é renovado (dedup pela data de vencimento). Vencido vira `consent_expired`.
+  - Alertas `sync_failed` (conexão foi pra `error`) e `bank_disconnected` (consentimento venceu)
+    na **transição** de status, dentro do `syncItem` — não a cada rodada.
+  - `sync-connection` com retry e intervalo crescente (`retryBackoff`, 5 tentativas, §6.2).
+    Item que não existe mais no Pluggy (404, ou id inválido) vira `disconnected` e para de tentar.
+  - "Atualizar agora" (`POST /connections/:id/sync`) também pede atualização ao Pluggy antes de
+    ler, e agenda uma segunda leitura; devolve `refreshRequested`.
+  - Testado em 2026-10-08 contra o banco real: as duas rodadas rodaram, a conexão real do Nubank
+    (Meu Pluggy) foi relida pela rodada, e as conexões **falsas do seed** (`item-nubank-1`,
+    `item-itau-1`, ids inventados) foram marcadas `disconnected` — o contador "bancos conectados"
+    do Perfil caiu de 4 pra 2 (as 2 reais; uma é a duplicada vazia que já estava na lista).
+  - Push ainda não existe (`push-dispatcher`, Expo Notifications) e a central de alertas
+    (`GET /alerts`) continua stub: por enquanto os alertas novos só aparecem no contador do sino
+    da Home.
+
 **Falta:**
 - Login com Apple — precisa do Apple Developer Program (US$99/ano), que ainda não existe.
 - Segurança: biometria, bloqueio automático ao sair do app, trocar e-mail e aparelhos conectados
@@ -178,8 +201,8 @@ protótipo do Figma.
 - Pluggy: validado ponta a ponta (ver "Feito" acima). O que falta em volta disso: tela de lista
   "Contas e cartões" com detalhe de cada conexão (CONTEXTO.md §6.10) — hoje só o contador no card
   do plano usa dado real, a lista propriamente dita continua mock; avisos de consentimento
-  vencendo (7 e 1 dia antes) e a tela "Renovar acesso"; atualização automática a cada 4-6h (job agendado —
-  a fila pg-boss já existe, ver "Feito"); eventos `transactions/*` do webhook (hoje só
+  vencendo — o alerta já é gerado (ver "Feito"), falta a tela "Acesso vencendo" e "Renovar
+  acesso" (connect token com `itemId`, já suportado pela API); eventos `transactions/*` do webhook (hoje só
   `item/*` é processado — ver "Decisões diferentes"); limpar a conexão duplicada vazia que sobrou dos testes
   (sem urgência, é dado de dev).
 - Importar fatura em **PDF** — precisa de extração de texto + LLM pra estruturar em JSON
@@ -190,8 +213,8 @@ protótipo do Figma.
 - Pipeline, passos 4–8 (parcelas, recorrências, fixo/variável por recorrência, fora do padrão) e
   o resto do passo 9 (`committed_by_month`, previsão da sobra, plano da semana) — são Fase 3.
   `committed_by_month`, `recurrences` e `installment_plans` continuam vindo do seed.
-- Jobs agendados do §9: `sync-connection` a cada 4-6h e `consent-expiry-check` (a fila já existe,
-  falta o `boss.schedule`).
+- Push (Expo Notifications + `push-dispatcher`, §9) e central de alertas (`GET /alerts`, §6.9) —
+  os alertas de conexão já são gravados, mas só aparecem no contador do sino.
 - O app não espera o job terminar: depois de "Mudar categoria"/ocultar/sincronizar, a Home pode
   mostrar o número antigo por alguns segundos até o próximo refetch.
 - Detalhe da categoria (`GET /spending/category/:id`, gráfico dos últimos 6 meses) — **agora
@@ -206,6 +229,14 @@ protótipo do Figma.
 ---
 
 ## Decisões diferentes do `CONTEXTO.md` original (e por quê)
+
+- **No plano "Meu Pluggy", a atualização automática a cada 4-6h não consegue forçar o banco** —
+  o Pluggy responde 400 "MeuPluggy item cant be updated" ao `PATCH /items/{id}` (confirmado em
+  2026-10-08 com a conexão real do Bruno). Nesse plano quem busca dado novo no banco é o próprio
+  app meu.pluggy.ai, no ritmo dele; a rodada de 6h só relê o que ele já trouxe. Ou seja: o dado
+  pode ficar mais velho que 6h, e "Atualizar agora" também só relê. O código já pede a
+  atualização de verdade e funciona sem mudança quando migrarmos pra um plano pago — mais um
+  ponto pra conversa do CONTEXTO.md §15.1.
 
 - **Tendência "vs. mês anterior"** (Home e Gastos) continua `null` quando o mês anterior não tem
   gasto em `monthly_summaries` — nunca inventa número. Com o pipeline rodando, isso só acontece
