@@ -20,7 +20,7 @@
 | 0 — Base | 🟡 quase completa (falta Sentry/PostHog) |
 | 1 — Interface com dados fictícios | ✅ completa |
 | 2 — Conta e dados reais | 🟡 em andamento (falta PDF, Contas e cartões, jobs agendados; Apple adiado) |
-| 3 — Inteligência | 🟡 em andamento (parcelas, assinaturas e comprometido prontos) |
+| 3 — Inteligência | 🟡 em andamento (parcelas, assinaturas, comprometido e sobra prontos) |
 | 4 — Monetização | ⬜ não iniciada |
 | 5 — Juntos e crescimento | ⬜ não iniciada |
 
@@ -299,6 +299,12 @@ protótipo do Figma.
   (`transactions.recurrence_id`). As 12 recorrências fictícias do seed saíram. Na conta do Bruno:
   Spotify, Crunchyroll, Claude, Melimais, Adoreshare e Framer (R$ 135,31/mês) + Conta Vivo
   (R$ 85,80, estimada); comprometido de novembro R$ 419,47, sem nenhum número do seed.
+- **"A vencer" na sobra prevista (§6.4)** — `dueUntilMonthEnd` em
+  `packages/shared/src/calculations/dueUntilMonthEnd.ts` (com teste): transações com data entre
+  agora e o fim do mês (as próximas parcelas que o Pluggy já devolve com data futura) + próximas
+  cobranças das recorrências ativas até o fim do mês (atrasada até 5 dias ainda conta). `GET /home`
+  usa no mês corrente (antes era sempre 0). Na conta do Bruno em 10/10: R$ 73,03 de parcelas +
+  R$ 115,41 de assinaturas = R$ 188,44; sobra R$ 6.041,14.
 - **Rótulos das barras do "Já comprometido" na Home** mostravam reais ÷ 10 ("234" pra R$ 2.340);
   agora reais inteiros, como no Figma (25:197). Também corrigidas chaves React repetidas no card
   de parcelas/assinaturas da Home ("3/3" aparecia duas vezes).
@@ -317,8 +323,13 @@ protótipo do Figma.
 - Assinaturas: "cobrança duplicada" (§6.3, passo 5) ainda não é detectada — entra junto com os
   alertas. O plano da semana da Home ainda é do seed e cita assinaturas fictícias ("Streaming de
   vídeo e App de idiomas").
-- Passos 6–8 (fixo/variável pela recorrência, fora do padrão, uso de assinaturas), "a vencer" do
-  mês na sobra prevista (`dueUntilMonthEnd` ainda é 0), plano da semana, telas de Parcelas,
+- **Gasto do mês fica abaixo do real enquanto o banco não entrega as compras recentes**: em
+  10/10, o limite usado do cartão do Bruno tinha R$ 1.410,07 de compras que ainda não vieram como
+  transação (ver "Fatura atual" em "Decisões diferentes"). A sobra fica maior que a real até
+  elas chegarem. Dá pra mostrar essa diferença como "compras ainda não detalhadas" — decisão de
+  produto em aberto.
+- "Como calculamos a sobra" (`/sobra`, `GET /forecast/leftover`) ainda não existe.
+- Passos 6–8 (fixo/variável pela recorrência, fora do padrão, uso de assinaturas), plano da semana, telas de Parcelas,
   Assinaturas e Fixos (§6.6; `/future/installments` etc. ainda são stubs), alertas e push, IA.
 - "Atualizar agora" leva ~1 min na conta do Bruno (1.135 transações): a sincronização grava uma
   transação por vez. Dá pra fazer em lote.
