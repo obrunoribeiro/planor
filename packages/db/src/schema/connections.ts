@@ -68,6 +68,10 @@ export const creditCards = pgTable('credit_cards', {
   closingDay: integer('closing_day').notNull(),
   dueDay: integer('due_day').notNull(),
   limitCents: integer('limit_cents'),
+  /** Fatura atual (aberta), calculada a cada sincronização — `currentBillCents` em
+   * `packages/shared`. `accounts.balance_cents` do cartão é o limite usado, que inclui parcelas
+   * de faturas futuras. Nulo até a próxima sincronização. */
+  currentBillCents: integer('current_bill_cents'),
 });
 
 export const cardStatements = pgTable('card_statements', {

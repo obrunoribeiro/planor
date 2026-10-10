@@ -22,6 +22,13 @@
       "when": 1791602737925,
       "tag": "0002_special_vin_gonzales",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791603356051,
+      "tag": "0003_great_crystal",
+      "breakpoints": true
     }
   ]
 }

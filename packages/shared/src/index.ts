@@ -4,6 +4,7 @@ export * from './dates';
 export * from './ofx';
 export * from './calculations/projectedLeftover';
 export * from './calculations/householdSettlement';
+export * from './calculations/creditCardBill';
 export * from './pipeline/normalize';
 export * from './pipeline/categorize';
 export * from './pipeline/monthlySummary';

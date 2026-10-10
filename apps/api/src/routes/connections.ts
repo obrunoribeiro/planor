@@ -1,6 +1,6 @@
 // Conexão bancária (Open Finance / Pluggy), importação de fatura e webhooks — CONTEXTO.md §6.2, §8.
 import { and, asc, eq } from 'drizzle-orm';
-import { accounts, connections, institutions, transactions } from '@planor/db';
+import { accounts, connections, creditCards, institutions, transactions } from '@planor/db';
 import { parseOfx } from '@planor/shared';
 import type { FastifyInstance } from 'fastify';
 import { env } from '../env';
@@ -100,11 +100,18 @@ export async function connectionRoutes(app: FastifyInstance) {
       .orderBy(asc(institutions.name));
 
     // Contas e cartões de cada conexão (§6.10: "lista por banco, com saldo da conta e fatura do
-    // cartão"). No cartão, `balance_cents` é o saldo que o Pluggy devolve pra conta de crédito —
-    // o valor da fatura aberta.
+    // cartão"). No cartão, `balance_cents` é o limite usado; a fatura vem de `credit_cards`.
     const accountRows = await db
-      .select({ id: accounts.id, connectionId: accounts.connectionId, type: accounts.type, name: accounts.name, balanceCents: accounts.balanceCents })
+      .select({
+        id: accounts.id,
+        connectionId: accounts.connectionId,
+        type: accounts.type,
+        name: accounts.name,
+        balanceCents: accounts.balanceCents,
+        currentBillCents: creditCards.currentBillCents,
+      })
       .from(accounts)
+      .leftJoin(creditCards, eq(creditCards.accountId, accounts.id))
       .where(eq(accounts.userId, userId))
       .orderBy(asc(accounts.type));
 
@@ -116,7 +123,13 @@ export async function connectionRoutes(app: FastifyInstance) {
     return rows.map((row) => ({
       ...row,
       accounts: accountRows.filter((account) => account.connectionId === row.id)
-        .map((account) => ({ id: account.id, type: account.type, name: account.name, balanceCents: account.balanceCents })),
+        .map((account) => ({
+          id: account.id,
+          type: account.type,
+          name: account.name,
+          balanceCents: account.balanceCents,
+          currentBillCents: account.currentBillCents,
+        })),
     }));
   });
 

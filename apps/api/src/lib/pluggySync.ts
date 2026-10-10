@@ -4,10 +4,11 @@
 // estabelecimento, categoria, agregados) roda depois, no job `process-transactions`.
 import { eq } from 'drizzle-orm';
 import { accounts, connections, creditCards, institutions, transactions } from '@planor/db';
+import { currentBillCents } from '@planor/shared';
 import type { connectionStatusEnum } from '@planor/db';
 import { enqueueProcessTransactions } from '../jobs/queue';
 import { db } from './db';
-import { getItem, listAccounts, listTransactions, type PluggyAccount, type PluggyItem } from './pluggy';
+import { getItem, listAccounts, listTransactions, type PluggyAccount, type PluggyItem, type PluggyTransaction } from './pluggy';
 
 type ConnectionStatus = (typeof connectionStatusEnum.enumValues)[number];
 
@@ -18,6 +19,14 @@ export class PluggyOwnershipError extends Error {}
 function mapAccountType(account: PluggyAccount): 'checking' | 'savings' | 'credit_card' {
   if (account.type === 'CREDIT') return 'credit_card';
   return account.subtype === 'SAVINGS_ACCOUNT' ? 'savings' : 'checking';
+}
+
+/** Valor no padrão do banco (gasto negativo). Usa o `type` explícito (DEBIT/CREDIT) em vez do
+ * sinal do valor — o sinal do Pluggy varia por tipo de conta (confirmado diferente em cartão de
+ * crédito) e o type não. */
+function transactionCents(tx: PluggyTransaction): number {
+  const cents = Math.abs(Math.round(tx.amount * 100));
+  return tx.type === 'DEBIT' ? -cents : cents;
 }
 
 function mapConnectionStatus(item: PluggyItem): ConnectionStatus {
@@ -102,6 +111,8 @@ export async function syncItem(userId: string, itemId: string): Promise<{ connec
       ? (await db.update(accounts).set(accountValues).where(eq(accounts.id, existingAccount.id)).returning())[0]!
       : (await db.insert(accounts).values(accountValues).returning())[0]!;
 
+    const pluggyTransactions = await listTransactions(pluggyAccount.id);
+
     if (pluggyAccount.type === 'CREDIT' && pluggyAccount.creditData) {
       const { creditLimit, balanceCloseDate, balanceDueDate } = pluggyAccount.creditData;
       // `.getUTCDate()`, não `.getDate()` — "2026-10-20" vira meia-noite UTC, e `.getDate()` lê no
@@ -110,6 +121,16 @@ export async function syncItem(userId: string, itemId: string): Promise<{ connec
         closingDay: balanceCloseDate ? new Date(balanceCloseDate).getUTCDate() : 1,
         dueDay: balanceDueDate ? new Date(balanceDueDate).getUTCDate() : 10,
         limitCents: creditLimit ? Math.round(creditLimit * 100) : null,
+        // O saldo da conta de crédito no Pluggy é o limite usado, não a fatura (ver
+        // `currentBillCents` em packages/shared).
+        currentBillCents: currentBillCents(
+          accountValues.balanceCents,
+          pluggyTransactions.map((tx) => ({
+            billMonth: tx.creditCardMetadata?.billForecastDate ?? null,
+            billId: tx.creditCardMetadata?.billId ?? null,
+            amountCents: -transactionCents(tx), // aqui gasto é positivo
+          })),
+        ),
       };
       await db
         .insert(creditCards)
@@ -117,12 +138,7 @@ export async function syncItem(userId: string, itemId: string): Promise<{ connec
         .onConflictDoUpdate({ target: creditCards.accountId, set: creditCardValues });
     }
 
-    const pluggyTransactions = await listTransactions(pluggyAccount.id);
     for (const tx of pluggyTransactions) {
-      // Usa o `type` explícito (DEBIT/CREDIT) em vez do sinal do valor — o sinal do Pluggy varia
-      // por tipo de conta (confirmado diferente em cartão de crédito) e o type não.
-      const signedAmountCents = tx.type === 'DEBIT' ? -Math.abs(Math.round(tx.amount * 100)) : Math.abs(Math.round(tx.amount * 100));
-
       const [inserted] = await db
         .insert(transactions)
         .values({
@@ -130,7 +146,7 @@ export async function syncItem(userId: string, itemId: string): Promise<{ connec
           accountId: account.id,
           externalId: tx.id,
           postedAt: new Date(tx.date),
-          amountCents: signedAmountCents,
+          amountCents: transactionCents(tx),
           descriptionRaw: tx.descriptionRaw ?? tx.description,
           merchantName: tx.description,
         })

@@ -113,8 +113,10 @@ export type ConnectionAccount = {
   id: string;
   type: 'checking' | 'savings' | 'credit_card';
   name: string;
-  /** Na conta: saldo. No cartão: fatura atual. */
+  /** Na conta: saldo. No cartão: limite usado (inclui parcelas de faturas futuras). */
   balanceCents: number;
+  /** Só no cartão: fatura aberta. Nulo até a primeira sincronização depois desse campo existir. */
+  currentBillCents: number | null;
 };
 
 export type ConnectionListItem = {

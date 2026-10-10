@@ -66,7 +66,15 @@ function ConnectionCard({ connection }: { connection: ConnectionListItem }) {
                 <Text style={styles.accountTitle}>{label.title}</Text>
                 <Text style={styles.accountDetail}>{label.detail}</Text>
               </View>
-              <Money cents={account.balanceCents} style={styles.accountValue} />
+              {account.type === 'credit_card' ? (
+                account.currentBillCents === null ? (
+                  <Text style={styles.accountValue}>—</Text>
+                ) : (
+                  <Money cents={account.currentBillCents} style={styles.accountValue} />
+                )
+              ) : (
+                <Money cents={account.balanceCents} style={styles.accountValue} />
+              )}
             </View>
           );
         })}

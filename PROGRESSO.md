@@ -135,6 +135,7 @@ protótipo do Figma.
   devolve as contas de cada conexão, `authorizedAt` e vem ordenado (ativos → com problema →
   desconectados); `POST /connections/token` aceita `connectionId` pra abrir o widget em modo de
   atualização (só de conexão do próprio usuário — recebe o nosso id, não o `itemId` do Pluggy).
+  "Fatura atual" do cartão calculada a partir do limite usado (ver "Decisões diferentes").
   Coluna nova `connections.authorized_at` (migração `0002_special_vin_gonzales.sql`, já aplicada),
   preenchida com o `createdAt` do item do Pluggy a cada sincronização. Ícone `mais` adicionado ao
   `packages/ui` (path real do Figma). Validado com a conta real do Bruno: lista, detalhe e
@@ -223,9 +224,16 @@ protótipo do Figma.
 - **Em "Contas e cartões", o banco aparece como "MeuPluggy", não "Nubank"** — no plano Meu
   Pluggy o conector é o próprio MeuPluggy, então é esse nome que o Pluggy devolve. Some quando
   trocarmos pra um plano com conectores de banco de verdade (§15.1).
-- **"Fatura atual" do cartão é o saldo da conta de crédito no Pluggy** (`accounts.balance_cents`),
-  não `card_statements` — a sincronização ainda não grava faturas. Falta confirmar com o app do
-  banco se esse saldo é a fatura aberta ou o total usado do limite (com parcelas futuras).
+- **"Fatura atual" do cartão = limite usado − parcelas já lançadas pra faturas futuras**
+  (`currentBillCents` em `packages/shared/src/calculations/creditCardBill.ts`, com teste),
+  calculada a cada sincronização e gravada em `credit_cards.current_bill_cents` (migração
+  `0003_great_crystal.sql`, já aplicada). O saldo que o Pluggy devolve pro cartão é o limite
+  usado, não a fatura — confirmado pelo Bruno em 2026-10-10: R$ 6.979,43 usado, fatura no app do
+  Nubank R$ 6.466,23, e a conta bateu no centavo (R$ 513,20 de parcelas nov/26–abr/27). Somar só
+  as transações da fatura aberta daria errado: o Pluggy ainda não tinha entregado R$ 1.410,07 de
+  compras recentes que já estavam no limite. Não usa `card_statements` (a sincronização ainda não
+  grava faturas: falta data de fechamento confiável). Limitação: entre o fechamento e o pagamento,
+  o valor mostra fatura fechada + aberta.
 - **Sheet "Não conseguimos atualizar" não diz "tentamos de novo sozinhos a cada hora"** (texto do
   Figma 83:2270) — essa nova tentativa automática ainda não existe (é o job agendado que falta),
   então o texto não promete isso. Usa a `Sheet` padrão (título + texto), sem o ícone de alerta
