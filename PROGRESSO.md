@@ -19,7 +19,7 @@
 |---|---|
 | 0 — Base | 🟡 quase completa (falta Sentry/PostHog) |
 | 1 — Interface com dados fictícios | ✅ completa |
-| 2 — Conta e dados reais | 🟡 em andamento (falta Apple, PDF, Contas e cartões, jobs agendados) |
+| 2 — Conta e dados reais | 🟡 em andamento (falta PDF, Contas e cartões, jobs agendados; Apple adiado) |
 | 3 — Inteligência | ⬜ não iniciada |
 | 4 — Monetização | ⬜ não iniciada |
 | 5 — Juntos e crescimento | ⬜ não iniciada |
@@ -186,7 +186,8 @@ protótipo do Figma.
 **Falta:**
 - Build de desenvolvimento no iPhone físico (precisa de Team de assinatura no Xcode) e no
   Android (`expo run:android` nunca foi rodado). O login com Google só foi testado no simulador iOS.
-- Login com Apple — precisa do Apple Developer Program (US$99/ano), que ainda não existe.
+- Login com Apple — **adiado por decisão do Bruno (2026-10-10)**. Precisa do Apple Developer
+  Program (US$99/ano), que ainda não existe. Só volta quando a conta for assinada.
 - Segurança: biometria, bloqueio automático ao sair do app, trocar e-mail e aparelhos conectados
   — só "Ocultar valores ao abrir" é real por enquanto (ver acima).
 - Pluggy: validado ponta a ponta (ver "Feito" acima). O que falta em volta disso: tela de lista
