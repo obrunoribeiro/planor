@@ -72,6 +72,9 @@ export const creditCards = pgTable('credit_cards', {
    * `packages/shared`. `accounts.balance_cents` do cartão é o limite usado, que inclui parcelas
    * de faturas futuras. Nulo até a próxima sincronização. */
   currentBillCents: integer('current_bill_cents'),
+  /** Parte da fatura aberta que o banco ainda não mandou como transação ("compras ainda não
+   * detalhadas") — `undetailedBillCents` em `packages/shared`. Entra no gasto do mês corrente. */
+  undetailedCents: integer('undetailed_cents'),
 });
 
 export const cardStatements = pgTable('card_statements', {

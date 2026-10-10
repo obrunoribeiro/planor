@@ -50,3 +50,35 @@ export function nextDueDateKey(dueDay: number, todayKey: string): string {
   if (Number(thisMonth.slice(8, 10)) >= day) return thisMonth;
   return month === 12 ? build(year + 1, 1) : build(year, month + 1);
 }
+
+/**
+ * Compras que já estão na fatura aberta mas que o banco ainda não mandou como transação:
+ *
+ *   não_detalhadas = fatura_atual − Σ gastos da fatura aberta já recebidos
+ *
+ * (conta real do Bruno em 2026-10-10: R$ 6.466,23 − R$ 5.056,16 = R$ 1.410,07). Só gastos entram
+ * na soma — estorno e pagamento ficariam de fora de propósito: na dúvida, o número sai menor, nunca
+ * inventa gasto (§1, "Honestidade nas telas").
+ *
+ * Devolve 0 quando a conta não é confiável:
+ *   - a última fatura fechada ainda não venceu (`lastClosedDueDateKey` ≥ hoje): o limite usado
+ *     ainda tem a fatura fechada inteira, e a diferença seria ela, não compra nova;
+ *   - nenhum lançamento conhecido na fatura aberta (logo depois do fechamento).
+ */
+export function undetailedBillCents(input: {
+  currentBillCents: AmountCents;
+  entries: CardBillEntry[];
+  lastClosedDueDateKey: string | null;
+  todayKey: string;
+}): AmountCents {
+  if (!input.lastClosedDueDateKey || input.lastClosedDueDateKey >= input.todayKey) return 0;
+
+  const open = input.entries.filter((entry) => entry.billId === null && entry.billMonth !== null);
+  if (open.length === 0) return 0;
+  const openMonth = open.map((entry) => entry.billMonth!).sort()[0]!;
+  const detailedCents = open
+    .filter((entry) => entry.billMonth === openMonth && entry.amountCents > 0)
+    .reduce((sum, entry) => sum + entry.amountCents, 0);
+
+  return Math.max(0, input.currentBillCents - detailedCents);
+}

@@ -19,6 +19,8 @@ export type HomeResponse = {
     monthlyIncomeCents: number;
     spentThisMonthCents: number;
     dueUntilMonthEndCents: number;
+    /** Compras que o banco ainda não detalhou — já incluídas em `spentThisMonthCents`. */
+    undetailedCents: number;
     projectedLeftoverCents: number;
   };
   committed: { nextMonthLabel: string; nextMonthAmountCents: number; months: { label: string; amountCents: number }[] } | null;
@@ -56,6 +58,8 @@ export type SpendingSummaryResponse = {
   fixedPct: number;
   variablePct: number;
   categories: SpendingCategory[];
+  /** Compras no cartão que o banco ainda não mandou como transação (já somadas em `totalCents`). */
+  undetailed: { amountCents: number; pctOfTotal: number } | null;
 };
 
 export type FutureTimelineResponse = {

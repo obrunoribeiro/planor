@@ -9,7 +9,8 @@ export type CategoryRowProps = {
   icon: IconName;
   name: string;
   amountCents: number;
-  kind: 'Fixo' | 'Variável';
+  /** Legenda embaixo da barra: "Fixo"/"Variável", ou um texto curto pra linhas especiais. */
+  kind: string;
   pctOfTotal: number;
   onPress?: () => void;
 };

@@ -81,7 +81,10 @@ export default function GastosScreen() {
             <View style={styles.totalTop}>
               <View style={styles.donutWrap}>
                 <Donut
-                  segments={data.categories.map((c, i) => ({ percent: c.pctOfTotal, color: DONUT_COLORS[i % DONUT_COLORS.length]! }))}
+                  segments={[
+                    ...data.categories.map((c, i) => ({ percent: c.pctOfTotal, color: DONUT_COLORS[i % DONUT_COLORS.length]! })),
+                    ...(data.undetailed ? [{ percent: data.undetailed.pctOfTotal, color: colors.dark.border.strong }] : []),
+                  ]}
                   size={132}
                   strokeWidth={16}
                 />
@@ -139,7 +142,7 @@ export default function GastosScreen() {
             </Pressable>
           </View>
 
-          {data.categories.length === 0 ? (
+          {data.categories.length === 0 && !data.undetailed ? (
             <EmptyState icon="gastos" title="Nada por aqui ainda" text="Assim que você tiver gastos categorizados este mês, eles aparecem aqui." />
           ) : (
             <View style={styles.categoriesCard}>
@@ -154,6 +157,17 @@ export default function GastosScreen() {
                   onPress={() => router.push(`/gastos/categoria/${category.categoryId}`)}
                 />
               ))}
+              {/* Parte da fatura do cartão que o banco ainda não mandou como transação. Sem
+                  categoria e sem detalhe — não dá pra saber de quê até o banco mandar. */}
+              {data.undetailed && (
+                <CategoryRow
+                  icon="banco"
+                  name="Ainda não detalhadas"
+                  amountCents={data.undetailed.amountCents}
+                  kind="Compras no cartão que o banco ainda não enviou"
+                  pctOfTotal={data.undetailed.pctOfTotal}
+                />
+              )}
             </View>
           )}
 
