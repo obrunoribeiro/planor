@@ -784,6 +784,7 @@ POST /auth/...                     (Supabase Auth no app; API valida o JWT)
 GET  /me · PATCH /me
 GET  /home                         # sobra, composição, comprometido, plano da semana, cards
 GET  /forecast/leftover            # detalhamento "Como calculamos a sobra"
+GET  /weekly-plan · PATCH /weekly-plan/items/:index   # plano da semana e marcar item
 POST /connections/token            # connect token do agregador
 GET  /connections · POST /connections/:id/sync · DELETE /connections/:id
 POST /webhooks/aggregator          # assinado; enfileira jobs

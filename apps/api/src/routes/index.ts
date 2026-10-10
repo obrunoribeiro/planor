@@ -15,6 +15,7 @@ import { meRoutes } from './me';
 import { settingsRoutes } from './settings';
 import { socialRoutes } from './social';
 import { transactionRoutes } from './transactions';
+import { weeklyPlanRoutes } from './weeklyPlan';
 
 export async function registerRoutes(app: FastifyInstance) {
   await app.register(healthRoutes);
@@ -22,6 +23,7 @@ export async function registerRoutes(app: FastifyInstance) {
   await app.register(settingsRoutes);
   await app.register(homeRoutes);
   await app.register(forecastRoutes);
+  await app.register(weeklyPlanRoutes);
   await app.register(categoryRoutes);
   await app.register(accountRoutes);
   await app.register(connectionRoutes);
