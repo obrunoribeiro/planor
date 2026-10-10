@@ -109,14 +109,25 @@ export type ImportResultResponse = {
   duplicates: number;
 };
 
+export type ConnectionAccount = {
+  id: string;
+  type: 'checking' | 'savings' | 'credit_card';
+  name: string;
+  /** Conta: saldo. Cartão: fatura atual (saldo devedor, positivo). */
+  balanceCents: number;
+};
+
 export type ConnectionListItem = {
   id: string;
   status: 'connected' | 'error' | 'disconnected' | 'consent_expired';
   consentExpiresAt: string | null;
+  /** Dias de calendário até o consentimento vencer (America/Sao_Paulo); negativo = já venceu. */
+  consentDaysLeft: number | null;
   lastSyncAt: string | null;
   errorCode: string | null;
   institutionName: string;
   institutionLogo: string | null;
+  accounts: ConnectionAccount[];
 };
 
 export type TransactionListItem = {
@@ -133,6 +144,21 @@ export type TransactionListItem = {
   isHidden: boolean;
   isInstallment: boolean;
   accountName: string | null;
+};
+
+/** `GET /spending/category/:id` — Gastos · Categoria (§6.5). */
+export type CategoryDetailResponse = {
+  category: { id: string; name: string; kind: 'fixed' | 'variable' };
+  month: string;
+  totalCents: number;
+  transactionsCount: number;
+  /** `null` sem nenhuma compra no mês. */
+  averageTicketCents: number | null;
+  /** Últimos 6 meses, do mais antigo pro mês pedido. */
+  months: { month: string; label: string; amountCents: number }[];
+  /** Média só dos meses em que já havia dado (`null` se nenhum). */
+  monthlyAverageCents: number | null;
+  transactions: TransactionListItem[];
 };
 
 export type TransactionDetailResponse = {

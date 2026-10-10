@@ -1,7 +1,7 @@
 // Transações, regras de categoria e resumo de gastos — CONTEXTO.md §6.3, §6.5, §8.
-import { and, desc, eq, gte, ilike, inArray, isNotNull, lt, or } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, or } from 'drizzle-orm';
 import { accounts, cardStatements, categories, categoryRules, monthlySummaries, transactions } from '@planor/db';
-import { monthRangeSaoPaulo, previousMonthKey, trendVsPreviousPct } from '@planor/shared';
+import { lastMonthKeys, monthAbbrevPtBR, monthlyAverageCents, monthRangeSaoPaulo, previousMonthKey, trendVsPreviousPct } from '@planor/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireUserId } from '../lib/auth';
@@ -289,7 +289,94 @@ export async function transactionRoutes(app: FastifyInstance) {
     };
   });
 
-  app.get('/spending/category/:id', async (_req, reply) =>
-    reply.code(501).send({ error: 'not_implemented', note: 'Detalhe da categoria — adiado até existir histórico de vários meses (ver PROGRESSO.md).' }),
-  );
+  // Gastos · Categoria (§6.5): total do mês, número de compras, ticket médio, últimos 6 meses com
+  // a média e a lista de transações. Totais vêm de `monthly_summaries` (o mesmo agregado do
+  // resumo de Gastos, pra os números baterem entre as telas); a lista e a contagem, das
+  // transações — com os mesmos filtros do pipeline (sem ocultas, sem transferências, só saídas,
+  // nada com data futura). "Outros" inclui as sem categoria, igual ao agregado.
+  app.get('/spending/category/:id', async (request, reply) => {
+    const userId = await requireUserId(request, reply);
+    if (!userId) return;
+
+    const { id } = request.params as { id: string };
+    if (!z.string().uuid().safeParse(id).success) return reply.code(400).send({ error: 'invalid_id' });
+    const month = (request.query as { month?: string }).month ?? currentMonthSaoPaulo();
+    if (!/^\d{4}-\d{2}$/.test(month)) return reply.code(400).send({ error: 'invalid_month' });
+
+    const [category] = await db
+      .select()
+      .from(categories)
+      .where(and(eq(categories.id, id), or(isNull(categories.userId), eq(categories.userId, userId))));
+    if (!category) return reply.code(404).send({ error: 'category_not_found' });
+    const isFallback = category.userId === null && category.name === 'Outros';
+
+    const monthKeys = lastMonthKeys(month, 6);
+    const summaries = await db
+      .select({ month: monthlySummaries.month, byCategory: monthlySummaries.byCategory })
+      .from(monthlySummaries)
+      .where(and(eq(monthlySummaries.userId, userId), inArray(monthlySummaries.month, monthKeys)));
+    const summaryByMonth = new Map(summaries.map((s) => [s.month, s.byCategory as Record<string, number>]));
+
+    const series = monthKeys.map((key) => ({
+      month: key,
+      label: monthAbbrevPtBR(key),
+      amountCents: summaryByMonth.get(key)?.[id] ?? 0,
+      hasData: summaryByMonth.has(key),
+    }));
+    const totalCents = series.at(-1)!.amountCents;
+
+    const { start, end } = monthRangeSaoPaulo(month);
+    const now = new Date();
+    const rows = await db
+      .select({
+        id: transactions.id,
+        postedAt: transactions.postedAt,
+        descriptionRaw: transactions.descriptionRaw,
+        merchantName: transactions.merchantName,
+        amountCents: transactions.amountCents,
+        categoryId: transactions.categoryId,
+        expenseKind: transactions.expenseKind,
+        isHidden: transactions.isHidden,
+        isInstallment: transactions.installmentPlanId,
+        accountName: accounts.name,
+      })
+      .from(transactions)
+      .leftJoin(accounts, eq(accounts.id, transactions.accountId))
+      .where(
+        and(
+          eq(transactions.userId, userId),
+          gte(transactions.postedAt, start),
+          lt(transactions.postedAt, end < now ? end : now),
+          lt(transactions.amountCents, 0),
+          eq(transactions.isHidden, false),
+          eq(transactions.isTransfer, false),
+          isFallback ? or(eq(transactions.categoryId, id), isNull(transactions.categoryId)) : eq(transactions.categoryId, id),
+        ),
+      )
+      .orderBy(desc(transactions.postedAt));
+
+    return {
+      category: { id: category.id, name: category.name, kind: category.defaultKind },
+      month,
+      totalCents,
+      transactionsCount: rows.length,
+      averageTicketCents: rows.length > 0 ? Math.round(totalCents / rows.length) : null,
+      months: series.map(({ month: key, label, amountCents }) => ({ month: key, label, amountCents })),
+      monthlyAverageCents: monthlyAverageCents(series),
+      transactions: rows.map((r) => ({
+        id: r.id,
+        postedAt: r.postedAt.toISOString(),
+        postedAtDateKey: postedAtDateKey(r.postedAt),
+        descriptionRaw: r.descriptionRaw,
+        merchantName: r.merchantName,
+        amountCents: r.amountCents,
+        categoryId: r.categoryId,
+        categoryName: category.name,
+        expenseKind: r.expenseKind,
+        isHidden: r.isHidden,
+        isInstallment: r.isInstallment !== null,
+        accountName: r.accountName,
+      })),
+    };
+  });
 }

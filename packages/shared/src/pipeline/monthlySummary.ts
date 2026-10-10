@@ -95,3 +95,23 @@ export function previousMonthKey(monthKey: string): string {
   const month = Number(monthKey.slice(5, 7));
   return month === 1 ? `${year - 1}-12` : `${year}-${String(month - 1).padStart(2, '0')}`;
 }
+
+/** Os `count` meses terminando em `monthKey`, do mais antigo pro mais novo: ("2026-10", 3) →
+ * ["2026-08", "2026-09", "2026-10"]. */
+export function lastMonthKeys(monthKey: string, count: number): string[] {
+  const keys = [monthKey];
+  while (keys.length < count) keys.unshift(previousMonthKey(keys[0]!));
+  return keys;
+}
+
+/**
+ * Média mensal de uma categoria (Gastos · Categoria, "gráfico dos últimos 6 meses com a média",
+ * CONTEXTO.md §6.5). Só entram meses em que o usuário JÁ TINHA dado (`hasData`) — um mês antes
+ * de conectar o banco não é "gastou zero", é "não sabemos", e puxaria a média pra baixo. Um mês
+ * com dado e zero nessa categoria entra como zero, normal. `null` sem nenhum mês com dado.
+ */
+export function monthlyAverageCents(months: readonly { amountCents: number; hasData: boolean }[]): number | null {
+  const withData = months.filter((m) => m.hasData);
+  if (withData.length === 0) return null;
+  return Math.round(withData.reduce((sum, m) => sum + m.amountCents, 0) / withData.length);
+}

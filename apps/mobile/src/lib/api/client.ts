@@ -24,7 +24,8 @@ export async function apiFetch<T>(
     headers: {
       ...init.headers,
       Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
+      // Só com corpo: o Fastify recusa (400) `application/json` com corpo vazio (ex.: DELETE).
+      ...(init.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
     },
   });
 
@@ -33,6 +34,8 @@ export async function apiFetch<T>(
     throw new ApiError(response.status, body.error ?? `Erro ${response.status}`);
   }
 
+  // 204 (ex.: DELETE /connections/:id) não tem corpo pra ler.
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 

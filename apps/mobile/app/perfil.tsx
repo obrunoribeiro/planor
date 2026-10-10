@@ -109,7 +109,12 @@ export default function PerfilScreen() {
         <GroupLabel>CONTA</GroupLabel>
         <Group>
           {/* TODO: navegar pra /perfil/contas (lista com detalhe de cada conexão) quando existir. */}
-          <ListItem icon="banco" title="Contas e cartões" value={`${connectedBanksCount} conectadas`} />
+          <ListItem
+            icon="banco"
+            title="Contas e cartões"
+            value={`${connectedBanksCount} ${connectedBanksCount === 1 ? 'conectada' : 'conectadas'}`}
+            onPress={() => router.push('/perfil/contas')}
+          />
           <ListItem icon="banco" title="Conectar banco" onPress={() => router.push('/perfil/conectar-banco')} />
           <ListItem icon="upload" title="Importar fatura ou extrato" onPress={() => router.push('/perfil/importar-fatura')} />
           {/* TODO: navegar pra /perfil/meu-plano quando existir. */}

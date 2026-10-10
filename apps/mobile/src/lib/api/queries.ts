@@ -3,6 +3,7 @@ import { useAuth } from '@/lib/auth/AuthProvider';
 import { apiFetch, apiUpload } from './client';
 import type {
   AccountListItem,
+  CategoryDetailResponse,
   CategoryListItem,
   ConnectionListItem,
   FutureTimelineResponse,
@@ -154,7 +155,17 @@ export function useUpdateTransactionMutation(id: string) {
       queryClient.setQueryData(['transaction', id], updated);
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });
       void queryClient.invalidateQueries({ queryKey: ['spending-summary'] });
+      void queryClient.invalidateQueries({ queryKey: ['category-detail'] });
     },
+  });
+}
+
+export function useCategoryDetailQuery(categoryId: string) {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['category-detail', categoryId],
+    queryFn: () => apiFetch<CategoryDetailResponse>(`/spending/category/${categoryId}`, { accessToken: accessToken! }),
+    enabled: !!accessToken && !!categoryId,
   });
 }
 
@@ -193,10 +204,49 @@ export function useConnectionsQuery() {
   });
 }
 
+/** `connectionId` = renovar/reconectar uma conexão existente (widget em modo atualização, §6.2). */
 export function useCreateConnectTokenMutation() {
   const accessToken = useAccessToken();
   return useMutation({
-    mutationFn: () => apiFetch<{ accessToken: string }>('/connections/token', { method: 'POST', accessToken: accessToken!, body: '{}' }),
+    mutationFn: (connectionId?: string) =>
+      apiFetch<{ accessToken: string }>('/connections/token', {
+        method: 'POST',
+        accessToken: accessToken!,
+        body: JSON.stringify(connectionId ? { connectionId } : {}),
+      }),
+  });
+}
+
+function invalidateConnectionData(queryClient: ReturnType<typeof useQueryClient>) {
+  void queryClient.invalidateQueries({ queryKey: ['connections'] });
+  void queryClient.invalidateQueries({ queryKey: ['accounts'] });
+  void queryClient.invalidateQueries({ queryKey: ['transactions'] });
+  void queryClient.invalidateQueries({ queryKey: ['home'] });
+  void queryClient.invalidateQueries({ queryKey: ['spending-summary'] });
+}
+
+/** "Atualizar agora" / "Tentar agora" (§6.2). */
+export function useRefreshConnectionMutation() {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (connectionId: string) =>
+      apiFetch<{ accountsSynced: number; transactionsImported: number; refreshRequested: boolean }>(
+        `/connections/${connectionId}/sync`,
+        { method: 'POST', accessToken: accessToken!, body: '{}' },
+      ),
+    onSettled: () => invalidateConnectionData(queryClient),
+  });
+}
+
+/** "Desconectar" (§6.2): revoga no agregador; o histórico importado fica. */
+export function useDisconnectConnectionMutation() {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (connectionId: string) =>
+      apiFetch<void>(`/connections/${connectionId}`, { method: 'DELETE', accessToken: accessToken! }),
+    onSuccess: () => invalidateConnectionData(queryClient),
   });
 }
 
