@@ -134,3 +134,34 @@ export function detectInstallmentPlans(transactions: InstallmentTransaction[], r
 
   return plans.sort((a, b) => a.lastMonth.localeCompare(b.lastMonth) || b.installmentCents - a.installmentCents);
 }
+
+export type InstallmentPlanProgress = {
+  paidCents: AmountCents;
+  remainingCents: AmountCents;
+  /** Vencimento da próxima parcela ("YYYY-MM-DD"), ou só o mês ("YYYY-MM") sem o dia de
+   * vencimento do cartão. Nulo quando a parcela do mês é a última. */
+  nextDue: string | null;
+};
+
+/**
+ * "Já pago", "falta pagar" e "próxima parcela" do detalhe do parcelamento (§6.6). Como no Figma
+ * (31:519: "3/10", R$ 240 → já pago R$ 720), a parcela do mês de referência conta como paga, e a
+ * próxima é a da fatura do mês seguinte.
+ */
+export function installmentPlanProgress(
+  plan: { installmentCents: AmountCents; totalCents: AmountCents; count: number; current: number },
+  referenceMonth: string,
+  dueDay: number | null,
+): InstallmentPlanProgress {
+  // "Falta" pelas parcelas que ainda vêm, e "já pago" pelo que sobra do total — o banco arredonda
+  // e a 1ª parcela costuma ter 1 centavo a mais (R$ 163,34 + 163,33 + 163,33), então contar pelo
+  // outro lado deixaria centavos "faltando" no fim.
+  const remainingCents = plan.installmentCents * Math.max(0, plan.count - plan.current);
+  const paidCents = plan.totalCents - remainingCents;
+  if (plan.current >= plan.count) return { paidCents, remainingCents, nextDue: null };
+
+  const nextMonth = addMonthsToKey(referenceMonth, 1);
+  if (!dueDay) return { paidCents, remainingCents, nextDue: nextMonth };
+  const lastDay = new Date(Date.UTC(Number(nextMonth.slice(0, 4)), Number(nextMonth.slice(5, 7)), 0)).getUTCDate();
+  return { paidCents, remainingCents, nextDue: `${nextMonth}-${String(Math.min(dueDay, lastDay)).padStart(2, '0')}` };
+}

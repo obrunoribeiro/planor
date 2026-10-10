@@ -2,6 +2,7 @@
 import { formatCents } from '@planor/shared';
 import { Badge, Chip, colors, EmptyState, gradients, GlowOrb, Icon, RevealScrollView, Skeleton, space, typography, useRevealProgress, type IconName } from '@planor/ui';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
@@ -32,16 +33,18 @@ function CommittedRow({
   subtitle,
   amountCents,
   last = false,
+  onPress,
 }: {
   icon: IconName;
   title: string;
   subtitle: string;
   amountCents: number;
   last?: boolean;
+  /** TODO: Assinaturas e Fixos ainda não têm tela — §6.6. */
+  onPress?: () => void;
 }) {
-  // TODO: navegar pra /futuro/parcelas, /futuro/assinaturas ou /futuro/fixos quando existirem.
   return (
-    <Pressable style={[styles.row, last ? styles.rowNoBorder : null]}>
+    <Pressable style={[styles.row, last ? styles.rowNoBorder : null]} onPress={onPress} disabled={!onPress}>
       <View style={styles.rowIcon}>
         <Icon name={icon} size={18} color="#C8C6FE" />
       </View>
@@ -165,6 +168,7 @@ export default function FuturoScreen() {
                 title="Parcelas"
                 subtitle={`${currentMonth.installments.count} parcelamentos`}
                 amountCents={currentMonth.installments.amountCents}
+                onPress={() => router.push('/futuro/parcelas')}
               />
               <CommittedRow
                 icon="play"
