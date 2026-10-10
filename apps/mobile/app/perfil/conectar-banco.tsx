@@ -2,21 +2,25 @@
 // Native, `react-native-pluggy-connect`) com um connectToken novo da nossa API. `includeSandbox`
 // só em dev: mostra o conector de testes "Pluggy Bank" (usuário `user-ok`, senha `password-ok`),
 // pra validar sem precisar de banco de verdade.
+//
+// Com `?connectionId=`, abre o widget em modo de atualização daquele banco ("Reconectar" quando o
+// consentimento venceu — §6.2, §6.10) em vez de conectar um banco novo.
 import { colors, EmptyState, ScreenHeader, Skeleton, space, typography } from '@planor/ui';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { PluggyConnect } from 'react-native-pluggy-connect';
 import { useCreateConnectTokenMutation, useSyncConnectionItemMutation } from '@/lib/api/queries';
 
 export default function ConectarBancoScreen() {
+  const { connectionId } = useLocalSearchParams<{ connectionId?: string }>();
   const { mutate: createToken, data: tokenData, isPending: isCreatingToken, isError: tokenError } = useCreateConnectTokenMutation();
   const { mutate: syncItem, isPending: isSyncing } = useSyncConnectionItemMutation();
   const [connectError, setConnectError] = useState<string | undefined>();
   const [resultMessage, setResultMessage] = useState<string | undefined>();
 
   useEffect(() => {
-    createToken();
+    createToken(connectionId);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só uma vez, ao abrir a tela
   }, []);
 
@@ -34,7 +38,7 @@ export default function ConectarBancoScreen() {
   if (tokenError || !tokenData) {
     return (
       <View style={[styles.screen, styles.centered]}>
-        <EmptyState icon="aviso" title="Não deu pra abrir" text="Confira sua internet e tenta de novo." actionLabel="Tentar de novo" onAction={() => createToken()} />
+        <EmptyState icon="aviso" title="Não deu pra abrir" text="Confira sua internet e tenta de novo." actionLabel="Tentar de novo" onAction={() => createToken(connectionId)} />
       </View>
     );
   }

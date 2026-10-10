@@ -30,6 +30,9 @@ export const connections = pgTable(
     status: connectionStatusEnum('status').notNull().default('connected'),
     /** Consentimento válido por até 12 meses — avisar com 7 e 1 dia de antecedência (§6.2). */
     consentExpiresAt: timestamp('consent_expires_at', { withTimezone: true }),
+    /** Quando o usuário autorizou o acesso — `createdAt` do item no Pluggy (§6.10, "Detalhe da
+     * conexão"). Nulo até a próxima sincronização pra conexões criadas antes desta coluna. */
+    authorizedAt: timestamp('authorized_at', { withTimezone: true }),
     lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
     errorCode: text('error_code'),
   },

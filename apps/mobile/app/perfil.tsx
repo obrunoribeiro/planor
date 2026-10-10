@@ -1,8 +1,8 @@
 // Perfil — CONTEXTO.md §6.10. Node 34:649 no Figma.
 //
-// `user`/`plan` vêm de verdade do `GET /me`. O resto da tela (contas conectadas, segurança,
-// casa, amigos, indicação) depende de features que ainda não existem (Pluggy, Fase 5 — ver
-// CONTEXTO.md §13), então continua com texto de exemplo do mock até essas partes existirem.
+// `user`/`plan` vêm de verdade do `GET /me` e o contador de bancos do `GET /connections`. O resto
+// da tela (biometria, casa, amigos, indicação) depende de features que ainda não existem (Fase 5
+// — ver CONTEXTO.md §13), então continua com texto de exemplo do mock até essas partes existirem.
 import { Avatar, Badge, colors, Dialog, EmptyState, gradients, GlowOrb, Icon, ListItem, ScreenHeader, Skeleton, space, typography } from '@planor/ui';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -108,8 +108,7 @@ export default function PerfilScreen() {
 
         <GroupLabel>CONTA</GroupLabel>
         <Group>
-          {/* TODO: navegar pra /perfil/contas (lista com detalhe de cada conexão) quando existir. */}
-          <ListItem icon="banco" title="Contas e cartões" value={`${connectedBanksCount} conectadas`} />
+          <ListItem icon="banco" title="Contas e cartões" value={`${connectedBanksCount} conectadas`} onPress={() => router.push('/perfil/contas')} />
           <ListItem icon="banco" title="Conectar banco" onPress={() => router.push('/perfil/conectar-banco')} />
           <ListItem icon="upload" title="Importar fatura ou extrato" onPress={() => router.push('/perfil/importar-fatura')} />
           {/* TODO: navegar pra /perfil/meu-plano quando existir. */}

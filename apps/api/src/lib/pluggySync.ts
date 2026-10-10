@@ -74,6 +74,7 @@ export async function syncItem(userId: string, itemId: string): Promise<{ connec
     aggregatorItemId: item.id,
     status: mapConnectionStatus(item),
     consentExpiresAt: item.consentExpiresAt ? new Date(item.consentExpiresAt) : null,
+    authorizedAt: new Date(item.createdAt),
     lastSyncAt: new Date(),
     errorCode: item.error?.code ?? null,
   };

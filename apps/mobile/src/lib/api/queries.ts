@@ -196,7 +196,42 @@ export function useConnectionsQuery() {
 export function useCreateConnectTokenMutation() {
   const accessToken = useAccessToken();
   return useMutation({
-    mutationFn: () => apiFetch<{ accessToken: string }>('/connections/token', { method: 'POST', accessToken: accessToken!, body: '{}' }),
+    // `connectionId` = reconectar um banco que já existe (consentimento vencido ou erro).
+    mutationFn: (connectionId?: string) =>
+      apiFetch<{ accessToken: string }>('/connections/token', { method: 'POST', accessToken: accessToken!, body: JSON.stringify({ connectionId }) }),
+  });
+}
+
+/** "Atualizar agora" (§6.2) — busca de novo no banco e recalcula tudo que depende das transações. */
+export function useSyncConnectionMutation(connectionId: string) {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<{ connectionId: string; accountsSynced: number; transactionsImported: number }>(`/connections/${connectionId}/sync`, {
+        method: 'POST',
+        accessToken: accessToken!,
+        body: '{}',
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['connections'] });
+      void queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      void queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      void queryClient.invalidateQueries({ queryKey: ['home'] });
+    },
+  });
+}
+
+/** "Desconectar" (§6.10) — revoga no agregador; o histórico já importado continua no app. */
+export function useDisconnectConnectionMutation(connectionId: string) {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => // Body vazio mas presente: o Fastify recusa `Content-Type: application/json` sem corpo.
+      apiFetch<void>(`/connections/${connectionId}`, { method: 'DELETE', accessToken: accessToken!, body: '{}' }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['connections'] });
+    },
   });
 }
 

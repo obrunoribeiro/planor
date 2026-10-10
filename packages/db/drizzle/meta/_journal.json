@@ -15,6 +15,13 @@
       "when": 1791411303095,
       "tag": "0001_steep_agent_brand",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791602737925,
+      "tag": "0002_special_vin_gonzales",
+      "breakpoints": true
     }
   ]
 }

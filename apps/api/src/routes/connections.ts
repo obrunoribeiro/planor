@@ -1,5 +1,5 @@
 // Conexão bancária (Open Finance / Pluggy), importação de fatura e webhooks — CONTEXTO.md §6.2, §8.
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { accounts, connections, institutions, transactions } from '@planor/db';
 import { parseOfx } from '@planor/shared';
 import type { FastifyInstance } from 'fastify';
@@ -34,7 +34,20 @@ export async function connectionRoutes(app: FastifyInstance) {
     const userId = await requireUserId(request, reply);
     if (!userId) return;
 
-    const { itemId } = (request.body as { itemId?: string } | null) ?? {};
+    // `connectionId` presente = reconectar um banco que já existe (consentimento vencido ou erro,
+    // §6.2 "Renovar acesso"). Recebe o id da nossa `connections`, não o `itemId` do Pluggy, pra
+    // garantir que só dá pra abrir o widget em modo de atualização num item que é do usuário.
+    const { connectionId } = (request.body as { connectionId?: string } | null) ?? {};
+    let itemId: string | undefined;
+    if (connectionId) {
+      const [connection] = await db
+        .select({ aggregatorItemId: connections.aggregatorItemId })
+        .from(connections)
+        .where(and(eq(connections.id, connectionId), eq(connections.userId, userId)));
+      if (!connection) return reply.code(404).send({ error: 'connection_not_found' });
+      itemId = connection.aggregatorItemId;
+    }
+
     try {
       const accessToken = await createConnectToken({ itemId, clientUserId: userId });
       return { accessToken };
@@ -70,10 +83,11 @@ export async function connectionRoutes(app: FastifyInstance) {
     const userId = await requireUserId(request, reply);
     if (!userId) return;
 
-    return db
+    const rows = await db
       .select({
         id: connections.id,
         status: connections.status,
+        authorizedAt: connections.authorizedAt,
         consentExpiresAt: connections.consentExpiresAt,
         lastSyncAt: connections.lastSyncAt,
         errorCode: connections.errorCode,
@@ -82,7 +96,28 @@ export async function connectionRoutes(app: FastifyInstance) {
       })
       .from(connections)
       .innerJoin(institutions, eq(institutions.id, connections.institutionId))
-      .where(eq(connections.userId, userId));
+      .where(eq(connections.userId, userId))
+      .orderBy(asc(institutions.name));
+
+    // Contas e cartões de cada conexão (§6.10: "lista por banco, com saldo da conta e fatura do
+    // cartão"). No cartão, `balance_cents` é o saldo que o Pluggy devolve pra conta de crédito —
+    // o valor da fatura aberta.
+    const accountRows = await db
+      .select({ id: accounts.id, connectionId: accounts.connectionId, type: accounts.type, name: accounts.name, balanceCents: accounts.balanceCents })
+      .from(accounts)
+      .where(eq(accounts.userId, userId))
+      .orderBy(asc(accounts.type));
+
+    // Ativos primeiro, depois os que pedem ação (erro, consentimento vencido), por último os
+    // desconectados — que continuam na lista porque o histórico deles segue no app (§6.2).
+    const statusOrder: Record<(typeof rows)[number]['status'], number> = { connected: 0, error: 1, consent_expired: 2, disconnected: 3 };
+    rows.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+
+    return rows.map((row) => ({
+      ...row,
+      accounts: accountRows.filter((account) => account.connectionId === row.id)
+        .map((account) => ({ id: account.id, type: account.type, name: account.name, balanceCents: account.balanceCents })),
+    }));
   });
 
   app.post('/connections/:id/sync', async (request, reply) => {

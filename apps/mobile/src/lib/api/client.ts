@@ -33,6 +33,8 @@ export async function apiFetch<T>(
     throw new ApiError(response.status, body.error ?? `Erro ${response.status}`);
   }
 
+  if (response.status === 204) return undefined as T; // ex.: DELETE /connections/:id
+
   return response.json() as Promise<T>;
 }
 

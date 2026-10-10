@@ -109,14 +109,24 @@ export type ImportResultResponse = {
   duplicates: number;
 };
 
+export type ConnectionAccount = {
+  id: string;
+  type: 'checking' | 'savings' | 'credit_card';
+  name: string;
+  /** Na conta: saldo. No cartão: fatura atual. */
+  balanceCents: number;
+};
+
 export type ConnectionListItem = {
   id: string;
   status: 'connected' | 'error' | 'disconnected' | 'consent_expired';
+  authorizedAt: string | null;
   consentExpiresAt: string | null;
   lastSyncAt: string | null;
   errorCode: string | null;
   institutionName: string;
   institutionLogo: string | null;
+  accounts: ConnectionAccount[];
 };
 
 export type TransactionListItem = {

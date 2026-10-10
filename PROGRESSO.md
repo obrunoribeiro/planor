@@ -9,7 +9,7 @@
 > **Regra (ver `CLAUDE.md`, Regra Nº 2): atualize este arquivo no mesmo commit que fecha ou avança
 > uma fase**, antes de abrir o PR — não depois.
 
-Última atualização: 2026-10-08.
+Última atualização: 2026-10-10.
 
 ---
 
@@ -19,7 +19,7 @@
 |---|---|
 | 0 — Base | 🟡 quase completa (falta Sentry/PostHog) |
 | 1 — Interface com dados fictícios | ✅ completa |
-| 2 — Conta e dados reais | 🟡 em andamento (falta Apple, PDF, Contas e cartões, jobs agendados) |
+| 2 — Conta e dados reais | 🟡 em andamento (falta Apple, PDF, jobs agendados, avisos de consentimento) |
 | 3 — Inteligência | ⬜ não iniciada |
 | 4 — Monetização | ⬜ não iniciada |
 | 5 — Juntos e crescimento | ⬜ não iniciada |
@@ -126,6 +126,19 @@ protótipo do Figma.
   pra outro usuário (Ana, por exemplo) conectar o banco dele pelo Planor com essas credenciais.
   Validar com os sócios se isso é aceitável pro beta fechado ou se precisa de um plano de
   desenvolvedor de verdade antes de abrir pra mais gente (ver CONTEXTO.md §15.1).
+- **Contas e cartões e Detalhe da conexão com dado real** (CONTEXTO.md §6.10; Figma 34:785,
+  53:1306, 53:1357 e 83:2270). Telas novas `apps/mobile/app/perfil/contas.tsx` (lista por banco,
+  saldo da conta, fatura do cartão, "Reconectar" com consentimento vencido, "Conectar outro
+  banco") e `apps/mobile/app/perfil/conexao/[id].tsx` (status, autorizado em, válido até, dados,
+  finalidade, "Atualizar agora" com sheet de falha e "Desconectar" com diálogo). Textos de status
+  compartilhados em `src/features/contas/connectionLabels.ts`. Backend: `GET /connections` agora
+  devolve as contas de cada conexão, `authorizedAt` e vem ordenado (ativos → com problema →
+  desconectados); `POST /connections/token` aceita `connectionId` pra abrir o widget em modo de
+  atualização (só de conexão do próprio usuário — recebe o nosso id, não o `itemId` do Pluggy).
+  Coluna nova `connections.authorized_at` (migração `0002_special_vin_gonzales.sql`, já aplicada),
+  preenchida com o `createdAt` do item do Pluggy a cada sincronização. Ícone `mais` adicionado ao
+  `packages/ui` (path real do Figma). Validado com a conta real do Bruno: lista, detalhe e
+  "Atualizar agora" (trouxe 2 transações novas) no simulador iOS e via HTTP.
 - **Falha de autorização encontrada e corrigida em `syncItem`** (`pluggySync.ts`) — depois de
   conectar o banco de verdade, foi feita uma auditoria completa (a pedido do Bruno) de toda rota
   que toca dado financeiro. `POST /connections/sync-item` recebia o `itemId` do Pluggy direto do
@@ -175,13 +188,13 @@ protótipo do Figma.
 - Login com Apple — precisa do Apple Developer Program (US$99/ano), que ainda não existe.
 - Segurança: biometria, bloqueio automático ao sair do app, trocar e-mail e aparelhos conectados
   — só "Ocultar valores ao abrir" é real por enquanto (ver acima).
-- Pluggy: validado ponta a ponta (ver "Feito" acima). O que falta em volta disso: tela de lista
-  "Contas e cartões" com detalhe de cada conexão (CONTEXTO.md §6.10) — hoje só o contador no card
-  do plano usa dado real, a lista propriamente dita continua mock; avisos de consentimento
-  vencendo (7 e 1 dia antes) e a tela "Renovar acesso"; atualização automática a cada 4-6h (job agendado —
+- Pluggy: validado ponta a ponta (ver "Feito" acima). O que falta em volta disso: avisos de
+  consentimento vencendo (7 e 1 dia antes) e as telas "Acesso vencendo"/"Renovar acesso" (Figma
+  83:2288 e 83:2329 — hoje "Reconectar" abre o widget direto); atualização automática a cada 4-6h (job agendado —
   a fila pg-boss já existe, ver "Feito"); eventos `transactions/*` do webhook (hoje só
-  `item/*` é processado — ver "Decisões diferentes"); limpar a conexão duplicada vazia que sobrou dos testes
-  (sem urgência, é dado de dev).
+  `item/*` é processado — ver "Decisões diferentes"); limpar as 2 conexões "MeuPluggy" duplicadas
+  sem contas que sobraram dos testes e as 3 conexões fictícias do seed (Nubank, Itaú, Banco Inter)
+  — aparecem em "Contas e cartões" do Bruno. Dá pra desconectar as duplicadas pela própria tela.
 - Importar fatura em **PDF** — precisa de extração de texto + LLM pra estruturar em JSON
   validado com zod (CONTEXTO.md §6.2), e o provedor de IA final ainda é decisão em aberto
   (CONTEXTO.md §15.6). `POST /imports` já devolve `501` com uma mensagem clara pra esse caso.
@@ -198,14 +211,27 @@ protótipo do Figma.
   desbloqueado**: `monthly_summaries` tem 13 meses reais com `byCategory`.
 - IA (`apps/mobile/app/(tabs)/ia.tsx`) continua 100% mockada — não é uma lacuna de "dados reais"
   como as outras, é que a função em si (chat com function calling) é escopo da Fase 3.
-- Perfil: o bloco de usuário/plano, o formulário de edição e o toggle de Segurança são reais. Os
-  grupos "Conta" (contas conectadas), o resto de "Preferências" (notificações, privacidade) e
+- Perfil: o bloco de usuário/plano, o formulário de edição, o toggle de Segurança e "Contas e
+  cartões" são reais. "Meu plano", o resto de "Preferências" (notificações, privacidade) e
   "Juntos" (casa/amigos/indicação) continuam com texto de exemplo de `lib/mocks/perfil.ts` —
   dependem de Pluggy/Fase 5.
 
 ---
 
 ## Decisões diferentes do `CONTEXTO.md` original (e por quê)
+
+- **Em "Contas e cartões", o banco aparece como "MeuPluggy", não "Nubank"** — no plano Meu
+  Pluggy o conector é o próprio MeuPluggy, então é esse nome que o Pluggy devolve. Some quando
+  trocarmos pra um plano com conectores de banco de verdade (§15.1).
+- **"Fatura atual" do cartão é o saldo da conta de crédito no Pluggy** (`accounts.balance_cents`),
+  não `card_statements` — a sincronização ainda não grava faturas. Falta confirmar com o app do
+  banco se esse saldo é a fatura aberta ou o total usado do limite (com parcelas futuras).
+- **Sheet "Não conseguimos atualizar" não diz "tentamos de novo sozinhos a cada hora"** (texto do
+  Figma 83:2270) — essa nova tentativa automática ainda não existe (é o job agendado que falta),
+  então o texto não promete isso. Usa a `Sheet` padrão (título + texto), sem o ícone de alerta
+  do Figma.
+- **Bancos desconectados continuam na lista**, sem contas e sem ações — o §6.2 diz que o histórico
+  continua no app, e esconder o banco esconderia de onde vêm essas transações.
 
 - **Tendência "vs. mês anterior"** (Home e Gastos) continua `null` quando o mês anterior não tem
   gasto em `monthly_summaries` — nunca inventa número. Com o pipeline rodando, isso só acontece

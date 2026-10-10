@@ -50,6 +50,7 @@ export type PluggyItem = {
   connector: { id: number; name: string; imageUrl?: string };
   status: string;
   executionStatus: string;
+  createdAt: string;
   consentExpiresAt?: string;
   error?: { code: string; message: string } | null;
   /** O `clientUserId` que a gente passou ao criar o connect token — é o que garante, do lado do

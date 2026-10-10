@@ -56,3 +56,39 @@ export function dayGroupLabel(dateKey: string): string {
 
   return `${day} de ${monthNamePtBR(`${year}-${String(month).padStart(2, '0')}`)}`;
 }
+
+const SAO_PAULO = 'America/Sao_Paulo';
+
+/** ISO → "2026-10-04", no fuso de São Paulo (CONTEXTO.md §3: "hoje"/vencimento usam esse fuso). */
+export function saoPauloDateKey(iso: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: SAO_PAULO }).format(new Date(iso));
+}
+
+/** ISO → "28/09" (ex.: "Acesso expirou em 28/09"). */
+export function dayMonthLabel(iso: string): string {
+  const dateKey = saoPauloDateKey(iso);
+  return `${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)}`;
+}
+
+/** ISO → "4 de outubro de 2026" (Detalhe da conexão). */
+export function longDateLabel(iso: string): string {
+  const dateKey = saoPauloDateKey(iso);
+  return `${Number(dateKey.slice(8, 10))} de ${monthNamePtBR(dateKey.slice(0, 7))} de ${dateKey.slice(0, 4)}`;
+}
+
+/** ISO → "há 5 minutos" / "há 5 min" (`short`), pra "atualizado há…". Mais de um dia vira data. */
+export function timeAgoLabel(iso: string, { short = false }: { short?: boolean } = {}): string {
+  const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (minutes < 1) return 'agora';
+  if (minutes < 60) return short ? `há ${minutes} min` : `há ${minutes} ${minutes === 1 ? 'minuto' : 'minutos'}`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return short ? `há ${hours} h` : `há ${hours} ${hours === 1 ? 'hora' : 'horas'}`;
+  return `em ${dayMonthLabel(iso)}`;
+}
+
+/** ISO → "hoje, 08:42" / "ontem, 08:42" / "4 de outubro, 08:42" (última atualização de um banco). */
+export function dayAndTimeLabel(iso: string): string {
+  const time = new Intl.DateTimeFormat('pt-BR', { timeZone: SAO_PAULO, hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+  const day = dayGroupLabel(saoPauloDateKey(iso));
+  return `${day === 'Hoje' || day === 'Ontem' ? day.toLowerCase() : day}, ${time}`;
+}
