@@ -1,9 +1,8 @@
 // GET /home — CONTEXTO.md §6.4 e §8 ("sobra, composição, comprometido, plano da semana, cards").
 //
 // `dueUntilMonthEndCents` (parcelas + assinaturas + fixos que ainda vencem este mês) sai de
-// `dueUntilMonthEnd` (packages/shared): transações com data entre agora e o fim do mês + próximas
-// cobranças das recorrências. `manual_recurring_bills` ("Nova conta fixa") ainda não tem tela.
-import { and, desc, eq, gt, isNull, lt, sql } from 'drizzle-orm';
+// `services/dueThisMonth.ts`. `manual_recurring_bills` ("Nova conta fixa") ainda não tem tela.
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import {
   alerts,
   committedByMonth,
@@ -14,10 +13,11 @@ import {
   users,
   weeklyPlans,
 } from '@planor/db';
-import { dueUntilMonthEnd, monthAbbrevPtBR, monthRangeSaoPaulo, previousMonthKey, projectedLeftover, trendVsPreviousPct } from '@planor/shared';
+import { monthAbbrevPtBR, previousMonthKey, projectedLeftover, trendVsPreviousPct } from '@planor/shared';
 import type { FastifyInstance } from 'fastify';
 import { requireUserId } from '../lib/auth';
 import { db } from '../lib/db';
+import { dueThisMonth } from '../services/dueThisMonth';
 import { undetailedSpendingCents } from '../services/undetailedSpending';
 
 function currentMonthSaoPaulo(): string {
@@ -78,45 +78,6 @@ async function dailySpendCumulative(userId: string, month: string): Promise<numb
   return cumulative;
 }
 
-/** Parcelas, assinaturas e fixos que ainda caem entre agora e o fim do mês (§6.4). */
-async function dueThisMonthCents(userId: string): Promise<number> {
-  const now = new Date();
-  const monthEnd = monthRangeSaoPaulo(currentMonthSaoPaulo()).end;
-  const [upcoming, activeRecurrences] = await Promise.all([
-    db
-      .select({
-        postedAt: transactions.postedAt,
-        amountCents: transactions.amountCents,
-        installmentCount: transactions.installmentCount,
-        installmentPlanId: transactions.installmentPlanId,
-      })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.userId, userId),
-          eq(transactions.isHidden, false),
-          eq(transactions.isTransfer, false),
-          gt(transactions.postedAt, now),
-          lt(transactions.postedAt, monthEnd),
-        ),
-      ),
-    db
-      .select({ kind: recurrences.kind, amountCents: recurrences.amountCents, nextChargeAt: recurrences.nextChargeAt })
-      .from(recurrences)
-      .where(and(eq(recurrences.userId, userId), eq(recurrences.status, 'active'))),
-  ]);
-
-  return dueUntilMonthEnd({
-    now,
-    transactions: upcoming.map((t) => ({
-      postedAt: t.postedAt,
-      amountCents: t.amountCents,
-      isInstallment: t.installmentPlanId !== null || (t.installmentCount ?? 0) > 1,
-    })),
-    recurrences: activeRecurrences,
-  }).totalCents;
-}
-
 export async function homeRoutes(app: FastifyInstance) {
   app.get('/home', async (request, reply) => {
     const userId = await requireUserId(request, reply);
@@ -142,7 +103,7 @@ export async function homeRoutes(app: FastifyInstance) {
     const isCurrentMonth = month === currentMonthSaoPaulo();
     const undetailedCents = isCurrentMonth ? await undetailedSpendingCents(userId) : 0;
     const spentThisMonthCents = (summary?.spentCents ?? 0) + undetailedCents;
-    const dueUntilMonthEndCents = isCurrentMonth ? await dueThisMonthCents(userId) : 0;
+    const dueUntilMonthEndCents = isCurrentMonth ? (await dueThisMonth(userId)).totalCents : 0;
 
     const [alertsCount] = await db
       .select({ value: sql<number>`count(*)::int` })

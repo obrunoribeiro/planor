@@ -62,6 +62,18 @@ export type SpendingSummaryResponse = {
   undetailed: { amountCents: number; pctOfTotal: number } | null;
 };
 
+export type LeftoverForecastResponse = {
+  month: string;
+  /** Último dia do mês, "YYYY-MM-DD". */
+  monthEndDateKey: string;
+  monthlyIncomeCents: number;
+  /** Já inclui `undetailedCents`. */
+  spentThisMonthCents: number;
+  undetailedCents: number;
+  due: { installmentsCents: number; subscriptionsCents: number; billsCents: number; otherCents: number; totalCents: number };
+  projectedLeftoverCents: number;
+};
+
 export type FutureTimelineResponse = {
   committed: { untilLabel: string | null; totalCents: number; months: { label: string; amountCents: number; active: boolean }[] };
   currentMonth: {

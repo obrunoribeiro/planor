@@ -8,6 +8,7 @@ import type {
   ConnectionListItem,
   FutureTimelineResponse,
   HomeResponse,
+  LeftoverForecastResponse,
   ImportResultResponse,
   MeResponse,
   SettingsResponse,
@@ -52,6 +53,15 @@ export function useSpendingSummaryQuery() {
   });
 }
 
+export function useLeftoverForecastQuery() {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['leftover-forecast'],
+    queryFn: () => apiFetch<LeftoverForecastResponse>('/forecast/leftover', { accessToken: accessToken! }),
+    enabled: !!accessToken,
+  });
+}
+
 export function useFutureTimelineQuery() {
   const accessToken = useAccessToken();
   return useQuery({
@@ -79,6 +89,7 @@ export function useUpdateMeMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['me'] });
       void queryClient.invalidateQueries({ queryKey: ['home'] });
+      void queryClient.invalidateQueries({ queryKey: ['leftover-forecast'] });
     },
   });
 }

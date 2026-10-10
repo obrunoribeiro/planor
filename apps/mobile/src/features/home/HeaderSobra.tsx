@@ -74,7 +74,10 @@ export function HeaderSobra({ userName, unreadAlerts, leftover, month }: HeaderS
             </View>
           </Pressable>
         </View>
-        <Money style={styles.valueAmount} cents={leftover.projectedLeftoverCents} />
+        {/* §6.4: "Tocar no valor abre 'Como calculamos a sobra'". */}
+        <Pressable onPress={() => router.push('/sobra')} accessibilityRole="button" accessibilityLabel="Como calculamos a sobra">
+          <Money style={styles.valueAmount} cents={leftover.projectedLeftoverCents} />
+        </Pressable>
       </View>
 
       <View style={styles.composition}>
