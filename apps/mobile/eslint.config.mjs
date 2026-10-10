@@ -7,9 +7,10 @@ export default [
     ignores: ['.expo/**', 'expo-env.d.ts'],
   },
   {
-    // babel.config.js e metro.config.js são CommonJS de verdade — Babel/Metro ainda esperam
-    // esse formato, independentemente do resto do pacote usar ESM.
-    files: ['babel.config.js', 'metro.config.js'],
+    // babel.config.js, metro.config.js e os config plugins do Expo (plugins/) são CommonJS de
+    // verdade — Babel, Metro e o prebuild ainda esperam esse formato, independentemente do resto
+    // do pacote usar ESM.
+    files: ['babel.config.js', 'metro.config.js', 'plugins/**/*.js'],
     languageOptions: {
       sourceType: 'commonjs',
       globals: { ...globals.node },
