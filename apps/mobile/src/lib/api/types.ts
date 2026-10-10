@@ -4,7 +4,7 @@ import type { Plan } from '@planor/shared';
 
 /** Mesmo formato de `WeeklyPlanItem` em `packages/shared/src/calculations/weeklyPlan.ts`. */
 export type WeeklyPlanItem = {
-  type: 'income' | 'card_bill' | 'category_limit' | 'categorize';
+  type: 'income' | 'card_bill' | 'subscription_usage' | 'category_limit' | 'categorize';
   title: string;
   description: string;
   actionLabel: string;

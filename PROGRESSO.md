@@ -354,6 +354,9 @@ protótipo do Figma.
   alerta `subscription_charged_after_cancel` (tipo novo, registrado no CONTEXTO §6.9).
   `latestPriceChange` em `packages/shared` (com teste). Testado com a conta real do Bruno:
   cancelar o Melimais tirou R$ 19,90 do comprometido de novembro, desfazer devolveu.
+  Plano da semana ganhou o item "Marcar assinaturas sem uso" (`subscription_usage`: assinaturas
+  ativas sem o uso marcado, leva pra Assinaturas, conclui sozinho quando todas forem marcadas).
+  Entra a partir do próximo plano (segunda), porque o desta semana já foi gerado.
 - **Rótulos das barras do "Já comprometido" na Home** mostravam reais ÷ 10 ("234" pra R$ 2.340);
   agora reais inteiros, como no Figma (25:197). Também corrigidas chaves React repetidas no card
   de parcelas/assinaturas da Home ("3/3" aparecia duas vezes).
@@ -370,8 +373,7 @@ protótipo do Figma.
 
 **Falta:**
 - Assinaturas: "cobrança duplicada" (§6.3, passo 5) ainda não é detectada — entra junto com os
-  alertas. Plano da semana: falta o item "Marcar assinaturas sem uso" (precisa da tela de
-  Assinaturas) e os que dependem de metas e dos objetivos do onboarding.
+  alertas. Plano da semana: faltam os itens que dependem de metas e dos objetivos do onboarding.
 - Parcelas: "Editar parcelamento" (Figma 49:1137 — nome, categoria, aviso antes da última,
   "Já quitei antecipado") e o filtro do topo ("Filtrar compromissos", 49:1095). Os valores das
   linhas do bloco do mês no Futuro ainda usam `formatCents` e não obedecem ao olho.
@@ -379,8 +381,7 @@ protótipo do Figma.
 - Assinaturas: "Me lembrar 3 dias antes da cobrança" (Figma 49:1269) e o lembrete de 30 dias do
   "Uso pouco" esperam o push (§6.9) — sem ele, "Lembrete criado" seria mentira. O alerta de
   cobrança depois do cancelamento só aparece no contador do sino (a central de alertas ainda não
-  existe). Item "Marcar assinaturas sem uso" no plano da semana: entra quando este PR e o do
-  plano estiverem na `main`.
+  existe).
 - Passos 6–8 (fixo/variável pela recorrência, fora do padrão, uso de assinaturas), telas de Parcelas,
   Assinaturas e Fixos (§6.6; `/future/installments` etc. ainda são stubs), alertas e push, IA.
 - "Atualizar agora" leva ~1 min na conta do Bruno (1.135 transações): a sincronização grava uma

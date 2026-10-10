@@ -5,6 +5,8 @@
 // metas e da marcação de uso das assinaturas, que ainda não existem):
 //   - `income`: a renda não está preenchida → conclui sozinho quando for preenchida;
 //   - `card_bill`: uma fatura vence nesta semana → o usuário marca;
+//   - `subscription_usage`: assinaturas ativas sem o uso marcado ("Marcar assinaturas sem uso",
+//     exemplo do CONTEXTO) → conclui sozinho quando todas tiverem o uso marcado;
 //   - `category_limit`: uma categoria variável está acima do ritmo dos últimos 3 meses →
 //     limite sugerido pra semana, com o quanto já foi gasto; o usuário marca;
 //   - `categorize`: compras do mês sem categoria → as 10 maiores; conclui sozinho quando todas
@@ -15,7 +17,7 @@ import type { AmountCents } from '../money';
 import { formatCents } from '../money';
 import { monthNamePtBR } from '../dates';
 
-export type WeeklyPlanItemType = 'income' | 'card_bill' | 'category_limit' | 'categorize';
+export type WeeklyPlanItemType = 'income' | 'card_bill' | 'subscription_usage' | 'category_limit' | 'categorize';
 
 export type WeeklyPlanItem = {
   /** Versão do formato — plano antigo (ex.: do seed) sem isso é gerado de novo. */
@@ -91,6 +93,8 @@ export type WeeklyPlanInput = {
   categories: { categoryId: string; name: string; kind: 'fixed' | 'variable'; monthToDateCents: AmountCents; averageMonthlyCents: AmountCents | null }[];
   /** Saídas do mês sem categoria (valor positivo). */
   uncategorized: { id: string; amountCents: AmountCents }[];
+  /** Assinaturas ativas que o usuário ainda não disse se usa. */
+  subscriptionsWithoutUsage: { amountCents: AmountCents }[];
 };
 
 function item(partial: Omit<WeeklyPlanItem, 'version' | 'completed' | 'completedAt' | 'completedAutomatically'>): WeeklyPlanItem {
@@ -127,6 +131,21 @@ export function buildWeeklyPlan(input: WeeklyPlanInput): WeeklyPlanItem[] {
         actionLabel: 'Ver contas e cartões',
         actionRoute: '/perfil/contas',
         data: { bank: bill.bank, amountCents: bill.amountCents, dueDateKey: bill.dueDateKey },
+      }),
+    );
+  }
+
+  if (input.subscriptionsWithoutUsage.length > 0) {
+    const count = input.subscriptionsWithoutUsage.length;
+    const monthlyCents = input.subscriptionsWithoutUsage.reduce((sum, s) => sum + s.amountCents, 0);
+    items.push(
+      item({
+        type: 'subscription_usage',
+        title: 'Marcar assinaturas sem uso',
+        description: `${count === 1 ? '1 assinatura soma' : `${count} assinaturas somam`} ${formatCents(monthlyCents)} por mês. As que você não usa entram nas sugestões de corte.`,
+        actionLabel: 'Ver assinaturas',
+        actionRoute: '/futuro/assinaturas',
+        data: {},
       }),
     );
   }
@@ -172,6 +191,8 @@ export function buildWeeklyPlan(input: WeeklyPlanInput): WeeklyPlanItem[] {
 export type WeeklyPlanLiveData = {
   todayKey: string;
   incomeSet: boolean;
+  /** Assinaturas ativas ainda sem uso marcado. */
+  subscriptionsWithoutUsage: number;
   /** Gasto da semana (segunda até hoje) por categoria. */
   weekSpentByCategory: Record<string, AmountCents>;
   /** Dos `transactionIds` dos itens `categorize`, os que ainda estão sem categoria. */
@@ -191,6 +212,7 @@ export function evaluateWeeklyPlan(items: WeeklyPlanItem[], live: WeeklyPlanLive
     };
 
     if (next.type === 'income' && live.incomeSet) complete();
+    if (next.type === 'subscription_usage' && live.subscriptionsWithoutUsage === 0) complete();
 
     if (next.type === 'category_limit' && next.data.categoryId && next.data.limitCents !== undefined) {
       const spent = live.weekSpentByCategory[next.data.categoryId] ?? 0;
