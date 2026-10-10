@@ -250,11 +250,9 @@ protótipo do Figma.
   `item/*` é processado — ver "Decisões diferentes").
 - **Limpeza da conta do Bruno, 2026-10-10 (com OK dele):** apagadas as 2 conexões "MeuPluggy"
   duplicadas, sem contas (também os itens no Pluggy), e o "Banco Inter" do seed (sem dados). Ficou
-  só a conexão MeuPluggy real (`5c462e1c…`, com as duas contas). **Ainda ficam** o Itaú e o
-  Nubank do seed, como "Desconectado": as faturas e os parcelamentos fictícios deles alimentam o
-  Futuro e o "já comprometido" da Home. Saem junto com `installment_plans`, `recurrences`,
-  `committed_by_month` e `weekly_plans` do seed quando a Fase 3 passar a calcular isso das
-  transações reais. Atenção: rodar `db:seed` de novo recria o Banco Inter.
+  só a conexão MeuPluggy real (`5c462e1c…`, com as duas contas). O Itaú e o Nubank do seed
+  saíram depois, na Fase 3 (ver lá). Do seed, só o `weekly_plans` ainda está na conta do Bruno.
+  Atenção: rodar `db:seed` de novo recria tudo isso.
 - Importar fatura em **PDF** — precisa de extração de texto + LLM pra estruturar em JSON
   validado com zod (CONTEXTO.md §6.2), e o provedor de IA final ainda é decisão em aberto
   (CONTEXTO.md §15.6). `POST /imports` já devolve `501` com uma mensagem clara pra esse caso.
