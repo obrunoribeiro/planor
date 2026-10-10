@@ -20,7 +20,7 @@
 | 0 — Base | 🟡 quase completa (falta Sentry/PostHog) |
 | 1 — Interface com dados fictícios | ✅ completa |
 | 2 — Conta e dados reais | 🟡 em andamento (falta PDF, Contas e cartões, jobs agendados; Apple adiado) |
-| 3 — Inteligência | ⬜ não iniciada |
+| 3 — Inteligência | 🟡 em andamento (parcelas e comprometido prontos) |
 | 4 — Monetização | ⬜ não iniciada |
 | 5 — Juntos e crescimento | ⬜ não iniciada |
 
@@ -256,9 +256,7 @@ protótipo do Figma.
   (CONTEXTO.md §15.6). `POST /imports` já devolve `501` com uma mensagem clara pra esse caso.
 - Pipeline, passo 2.3 (LLM barato pro que as regras não pegam) — depende do provedor de IA
   (CONTEXTO.md §15.6). Hoje ~70% das saídas reais ficam sem categoria ("Outros").
-- Pipeline, passos 4–8 (parcelas, recorrências, fixo/variável por recorrência, fora do padrão) e
-  o resto do passo 9 (`committed_by_month`, previsão da sobra, plano da semana) — são Fase 3.
-  `committed_by_month`, `recurrences` e `installment_plans` continuam vindo do seed.
+- Pipeline, passos 5–8 e o resto do passo 9 — viraram Fase 3 (ver a seção dela abaixo).
 - Push (Expo Notifications + `push-dispatcher`, §9) e central de alertas (`GET /alerts`, §6.9) —
   os alertas de conexão já são gravados, mas só aparecem no contador do sino.
 - O app não espera o job terminar: depois de "Mudar categoria"/ocultar/sincronizar, a Home pode
@@ -274,7 +272,56 @@ protótipo do Figma.
 
 ---
 
+## Fase 3 — Inteligência
+
+**Feito:**
+- **Parcelas (§6.3, passo 4)** — `detectInstallmentPlans` em
+  `packages/shared/src/pipeline/installments.ts` (com teste). Lê "n de m" do Pluggy (que manda
+  número, total e mês da fatura de cada parcela de cartão — colunas novas
+  `transactions.installment_number`, `installment_count` e `bill_month`, migração
+  `0004_pretty_energizer.sql`, já aplicada; a sincronização preenche também nas transações que já
+  existiam) e, sem isso, o sufixo da descrição ("3/10", "PARC 03/10", "PARCELA 3 DE 10"). Agrupa
+  por conta + estabelecimento + total de parcelas + mês da 1ª parcela. O job `process-transactions`
+  grava os parcelamentos ativos em `installment_plans` (atualiza no lugar os que já existiam,
+  apaga os que terminaram) e liga cada parcela a eles (`transactions.installment_plan_id`).
+- **Comprometido (§6.3, passo 9)** — `projectCommittedByMonth` em
+  `packages/shared/src/calculations/committedByMonth.ts` (com teste): próximos 6 meses, a partir do
+  mês seguinte, com parcelas (valor real de cada parcela quando ela já existe como transação) +
+  recorrências ativas. Recalculado no mesmo job; `committed_by_month` não vem mais do seed.
+- **Futuro: cards de fatura com a fatura real** de cada cartão conectado
+  (`credit_cards.current_bill_cents`) e vencimento pelo dia de vencimento do cartão
+  (`nextDueDateKey`, com teste).
+- **Conexões fictícias do seed removidas da conta do Bruno** (2026-10-10, ele mesmo rodou o
+  script): Itaú e Nubank, com 4 contas, 2 faturas, 8 transações ocultas e 3 exemplos de Casa e
+  Amigos ligados a elas (`household_expenses`, `split_expenses`). Ficou só a conexão MeuPluggy
+  real, com 1.135 transações. Rodar `db:seed` de novo recria tudo isso.
+- Validado com a conta real do Bruno em 2026-10-10: 9 parcelamentos ativos (os mesmos 9 contados
+  direto nos dados do Pluggy); parcelas futuras de nov/26 a abr/27 somam R$ 513,20 — exatamente a
+  diferença entre limite usado e fatura do Nubank. Os 5 parcelamentos fictícios do seed saíram.
+
+**Falta:**
+- **Assinaturas e fixos recorrentes (passo 5)** — `recurrences` ainda é do seed (8 assinaturas e
+  4 fixos fictícios), e por isso o comprometido de cada mês ainda soma R$ 187,40 + R$ 1.032,75
+  inventados em cima das parcelas reais.
+- Passos 6–8 (fixo/variável pela recorrência, fora do padrão, uso de assinaturas), "a vencer" do
+  mês na sobra prevista (`dueUntilMonthEnd` ainda é 0), plano da semana, telas de Parcelas,
+  Assinaturas e Fixos (§6.6; `/future/installments` etc. ainda são stubs), alertas e push, IA.
+- "Atualizar agora" leva ~1 min na conta do Bruno (1.135 transações): a sincronização grava uma
+  transação por vez. Dá pra fazer em lote.
+
+---
+
 ## Decisões diferentes do `CONTEXTO.md` original (e por quê)
+
+- **Só parcelamentos ativos ficam em `installment_plans`** (a última parcela é do mês atual ou
+  depois). Os que já terminaram não aparecem em lugar nenhum hoje, e guardar todos inflaria os
+  totais da Home, que soma a tabela inteira.
+- **Comprometido não inclui o mês corrente** — começa no mês seguinte (o mês corrente é "a vencer",
+  outro número do §2). Recorrência mensal sem data de próxima cobrança é projetada em todo mês;
+  recorrência com intervalo maior que 35 dias e sem data não entra (não dá pra saber o mês).
+- **Futuro não lê `card_statements`** — a sincronização ainda não grava faturas (falta data de
+  fechamento confiável). O card usa a fatura aberta calculada e o próximo vencimento pelo dia do
+  cartão.
 
 - **Detalhe da categoria diz "compras", não "pedidos"** (Figma 28:396 usa "14 pedidos" porque o
   exemplo é Delivery) — a tela serve pra qualquer categoria, e "pedidos de Moradia" não faz

@@ -142,7 +142,12 @@ export type PluggyTransaction = {
   amount: number;
   type: 'DEBIT' | 'CREDIT';
   /** Só em cartão de crédito. `billId` presente = já está numa fatura fechada. */
-  creditCardMetadata?: { billId?: string | null; billForecastDate?: string | null } | null;
+  creditCardMetadata?: {
+    billId?: string | null;
+    billForecastDate?: string | null;
+    installmentNumber?: number | null;
+    totalInstallments?: number | null;
+  } | null;
 };
 
 /** `GET /transactions` (página/pageSize) foi descontinuado pelo Pluggy em favor de
