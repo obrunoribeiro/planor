@@ -29,6 +29,13 @@
       "when": 1791603356051,
       "tag": "0003_great_crystal",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791652916540,
+      "tag": "0004_pretty_energizer",
+      "breakpoints": true
     }
   ]
 }

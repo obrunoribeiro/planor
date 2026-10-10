@@ -34,6 +34,12 @@ export const transactions = pgTable(
     /** Transferência entre contas próprias do usuário — nunca entra em `spentThisMonth` (§6.4). */
     isTransfer: boolean('is_transfer').notNull().default(false),
     installmentPlanId: uuid('installment_plan_id').references(() => installmentPlans.id),
+    /** "n de m" da parcela, quando o agregador informa (§6.3, passo 4). Sem isso, o pipeline lê
+     * o sufixo da descrição ("3/10", "PARC 03/10"). */
+    installmentNumber: integer('installment_number'),
+    installmentCount: integer('installment_count'),
+    /** Mês da fatura em que a transação cai ("YYYY-MM"), quando o agregador informa. */
+    billMonth: text('bill_month'),
     recurrenceId: uuid('recurrence_id').references(() => recurrences.id),
     statementId: uuid('statement_id').references(() => cardStatements.id),
     note: text('note'),

@@ -3,16 +3,21 @@
 // mesmas transações não muda nada.
 //
 // Cobre: passo 1 (nome do estabelecimento + pagamento de fatura como transferência), passo 2
-// (categorização por regras do usuário e globais) e passo 9 (só `monthly_summaries`). Ficam pra
-// Fase 3: parcelas (4), recorrências (5), fora do padrão (7), `committed_by_month` e plano da
-// semana (9) — ver PROGRESSO.md.
-import { and, eq, isNull, lte, or, sql } from 'drizzle-orm';
-import { accounts, categories, categoryRules, monthlySummaries, transactions } from '@planor/db';
+// (categorização por regras do usuário e globais), passo 4 (parcelas) e passo 9
+// (`monthly_summaries` e `committed_by_month`). Ficam pra depois: recorrências (5), fora do padrão
+// (7) e plano da semana (9) — ver PROGRESSO.md.
+import { and, eq, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
+import { accounts, categories, categoryRules, committedByMonth, installmentPlans, monthlySummaries, recurrences, transactions } from '@planor/db';
 import {
   buildMonthlySummaries,
   categorizeTransaction,
+  detectInstallmentPlans,
   isCardBillPayment,
+  monthKeySaoPaulo,
+  normalizeForMatch,
   normalizeMerchantName,
+  projectCommittedByMonth,
+  type DetectedInstallmentPlan,
   type ExpenseKind,
 } from '@planor/shared';
 import { db } from '../lib/db';
@@ -175,8 +180,122 @@ async function recomputeMonthlySummaries(userId: string): Promise<{ months: numb
   return { months: summaries.length };
 }
 
+const COMMITTED_HORIZON_MONTHS = 6; // o Futuro mostra os próximos 6 meses (§6.6)
+
+/** Mesma identidade que o passo 4 usa pra agrupar parcelas (sem o valor, que varia 1 centavo). */
+function planKey(plan: { accountId: string; merchantName: string; count: number; firstMonth: string }) {
+  return [plan.accountId, normalizeForMatch(plan.merchantName), plan.count, plan.firstMonth].join('|');
+}
+
+/** Passo 4 — parcelamentos ativos. Atualiza no lugar os que já existiam (mantém o id e o que o
+ * usuário marcou, como "já quitei antecipado"), cria os novos, apaga os que terminaram ou não
+ * aparecem mais, e liga cada parcela (transação) ao seu parcelamento. */
+async function syncInstallmentPlans(userId: string, referenceMonth: string): Promise<DetectedInstallmentPlan[]> {
+  const rows = await db
+    .select({
+      id: transactions.id,
+      accountId: transactions.accountId,
+      descriptionRaw: transactions.descriptionRaw,
+      merchantName: transactions.merchantName,
+      postedAt: transactions.postedAt,
+      amountCents: transactions.amountCents,
+      installmentNumber: transactions.installmentNumber,
+      installmentCount: transactions.installmentCount,
+      billMonth: transactions.billMonth,
+    })
+    .from(transactions)
+    .where(and(eq(transactions.userId, userId), eq(transactions.isHidden, false), eq(transactions.isTransfer, false)));
+
+  const detected = detectInstallmentPlans(rows, referenceMonth);
+
+  await db.transaction(async (tx) => {
+    const existing = await tx.select().from(installmentPlans).where(eq(installmentPlans.userId, userId));
+    const existingByKey = new Map(
+      existing.map((p) => [
+        planKey({ accountId: p.accountId, merchantName: p.merchantName, count: p.count, firstMonth: p.firstDate.slice(0, 7) }),
+        p,
+      ]),
+    );
+
+    const keptIds = new Set<string>();
+    const links: { transactionId: string; planId: string }[] = [];
+    for (const plan of detected) {
+      const values = {
+        userId,
+        accountId: plan.accountId,
+        merchantName: plan.merchantName,
+        totalCents: plan.totalCents,
+        installmentCents: plan.installmentCents,
+        count: plan.count,
+        current: plan.current,
+        firstDate: `${plan.firstMonth}-01`,
+        lastDate: `${plan.lastMonth}-01`,
+      };
+      const match = existingByKey.get(planKey(plan));
+      const planId = match
+        ? (
+            await tx
+              .update(installmentPlans)
+              .set({ current: values.current, installmentCents: values.installmentCents, totalCents: values.totalCents, lastDate: values.lastDate })
+              .where(eq(installmentPlans.id, match.id))
+              .returning()
+          )[0]!.id
+        : (await tx.insert(installmentPlans).values(values).returning())[0]!.id;
+      keptIds.add(planId);
+      for (const transactionId of plan.transactionIds) links.push({ transactionId, planId });
+    }
+
+    // Desliga tudo e religa o que vale agora — mais simples que comparar vínculo a vínculo.
+    await tx
+      .update(transactions)
+      .set({ installmentPlanId: null })
+      .where(and(eq(transactions.userId, userId), isNotNull(transactions.installmentPlanId)));
+    for (let i = 0; i < links.length; i += UPDATE_CHUNK) {
+      const values = sql.join(
+        links.slice(i, i + UPDATE_CHUNK).map((l) => sql`(${l.transactionId}::uuid, ${l.planId}::uuid)`),
+        sql`, `,
+      );
+      await tx.execute(sql`
+        update transactions as t set installment_plan_id = v.plan_id
+        from (values ${values}) as v(id, plan_id)
+        where t.id = v.id
+      `);
+    }
+
+    const staleIds = existing.filter((p) => !keptIds.has(p.id)).map((p) => p.id);
+    if (staleIds.length > 0) await tx.delete(installmentPlans).where(inArray(installmentPlans.id, staleIds));
+  });
+
+  return detected;
+}
+
+/** Passo 9 — `committed_by_month` dos próximos meses: parcelas detectadas + recorrências ativas. */
+async function recomputeCommittedByMonth(userId: string, referenceMonth: string, plans: DetectedInstallmentPlan[]): Promise<{ months: number }> {
+  const activeRecurrences = await db
+    .select({ kind: recurrences.kind, amountCents: recurrences.amountCents, cadenceDays: recurrences.cadenceDays, nextChargeAt: recurrences.nextChargeAt })
+    .from(recurrences)
+    .where(and(eq(recurrences.userId, userId), eq(recurrences.status, 'active')));
+
+  const months = projectCommittedByMonth({
+    referenceMonth,
+    horizon: COMMITTED_HORIZON_MONTHS,
+    installments: plans,
+    recurrences: activeRecurrences,
+  });
+
+  await db.transaction(async (tx) => {
+    await tx.delete(committedByMonth).where(eq(committedByMonth.userId, userId));
+    if (months.length > 0) await tx.insert(committedByMonth).values(months.map((m) => ({ userId, ...m })));
+  });
+
+  return { months: months.length };
+}
+
 export async function processUserTransactions(userId: string) {
+  const referenceMonth = monthKeySaoPaulo(new Date());
   const { updated } = await normalizeAndCategorize(userId);
   const { months } = await recomputeMonthlySummaries(userId);
-  return { updated, months };
+  const plans = await syncInstallmentPlans(userId, referenceMonth);
+  const committed = await recomputeCommittedByMonth(userId, referenceMonth, plans);
+  return { updated, months, installmentPlans: plans.length, committedMonths: committed.months };
 }
