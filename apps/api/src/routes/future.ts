@@ -1,7 +1,7 @@
 // Linha do tempo, parcelas, assinaturas e fixos — CONTEXTO.md §6.6, §8.
-import { and, eq } from 'drizzle-orm';
-import { accounts, cardStatements, committedByMonth, connections, installmentPlans, institutions, recurrences } from '@planor/db';
-import { monthAbbrevPtBR, monthNamePtBR } from '@planor/shared';
+import { and, eq, isNotNull, ne } from 'drizzle-orm';
+import { accounts, committedByMonth, connections, creditCards, installmentPlans, institutions, recurrences } from '@planor/db';
+import { monthAbbrevPtBR, monthNamePtBR, nextDueDateKey } from '@planor/shared';
 import type { FastifyInstance } from 'fastify';
 import { requireUserId } from '../lib/auth';
 import { db } from '../lib/db';
@@ -44,17 +44,22 @@ export async function futureRoutes(app: FastifyInstance) {
         ? billNames.join(' e ')
         : `${billNames.slice(0, 2).join(', ')} e mais ${billNames.length - 2}`;
 
-    const statements = await db
+    // Fatura aberta de cada cartão conectado (`credit_cards.current_bill_cents`, calculada na
+    // sincronização). A sincronização ainda não grava `card_statements`; o vencimento sai do dia
+    // de vencimento do cartão.
+    const cards = await db
       .select({
         bankName: institutions.name,
-        totalCents: cardStatements.totalCents,
-        dueDate: cardStatements.dueDate,
+        totalCents: creditCards.currentBillCents,
+        dueDay: creditCards.dueDay,
       })
-      .from(cardStatements)
-      .innerJoin(accounts, eq(cardStatements.accountId, accounts.id))
+      .from(creditCards)
+      .innerJoin(accounts, eq(creditCards.accountId, accounts.id))
       .innerJoin(connections, eq(accounts.connectionId, connections.id))
       .innerJoin(institutions, eq(connections.institutionId, institutions.id))
-      .where(and(eq(accounts.userId, userId), eq(cardStatements.status, 'open')));
+      .where(and(eq(accounts.userId, userId), ne(connections.status, 'disconnected'), isNotNull(creditCards.currentBillCents)));
+    const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+    const statements = cards.map((card) => ({ bankName: card.bankName, totalCents: card.totalCents!, dueDate: nextDueDateKey(card.dueDay, todayKey) }));
 
     const lastMonthKey = committedRows.at(-1)?.month;
 
@@ -76,7 +81,7 @@ export async function futureRoutes(app: FastifyInstance) {
       statements: statements.map((s) => ({
         bank: s.bankName,
         amountCents: s.totalCents,
-        dueDate: s.dueDate.toISOString().slice(0, 10),
+        dueDate: s.dueDate,
       })),
     };
   });

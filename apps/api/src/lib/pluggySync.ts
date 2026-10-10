@@ -2,7 +2,7 @@
 // (`item/created`, `item/updated`, `transactions/*`) quanto pelo "Atualizar agora" manual
 // (CONTEXTO.md §6.2, §6.3 passo 1 — dedup por id externo). O resto do pipeline (nome do
 // estabelecimento, categoria, agregados) roda depois, no job `process-transactions`.
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { accounts, connections, creditCards, institutions, transactions } from '@planor/db';
 import { currentBillCents } from '@planor/shared';
 import type { connectionStatusEnum } from '@planor/db';
@@ -149,7 +149,16 @@ export async function syncItem(userId: string, itemId: string): Promise<{ connec
     }
 
     for (const tx of pluggyTransactions) {
-      const [inserted] = await db
+      const metadata = tx.creditCardMetadata;
+      const installment = {
+        installmentNumber: metadata?.installmentNumber ?? null,
+        installmentCount: metadata?.totalInstallments ?? null,
+        billMonth: metadata?.billForecastDate ?? null,
+      };
+      // Transação que já existe só tem os dados da parcela/fatura atualizados (o resto — nome,
+      // categoria, nota — pode ter sido mexido pelo pipeline ou pelo usuário). `xmax = 0` só é
+      // verdade em linha recém-inserida: é assim que separa "importada agora" de "atualizada".
+      const [row] = await db
         .insert(transactions)
         .values({
           userId,
@@ -159,10 +168,15 @@ export async function syncItem(userId: string, itemId: string): Promise<{ connec
           amountCents: transactionCents(tx),
           descriptionRaw: tx.descriptionRaw ?? tx.description,
           merchantName: tx.description,
+          ...installment,
         })
-        .onConflictDoNothing({ target: [transactions.accountId, transactions.externalId] })
-        .returning();
-      if (inserted) transactionsImported += 1;
+        .onConflictDoUpdate({
+          target: [transactions.accountId, transactions.externalId],
+          set: installment,
+          setWhere: sql`(${transactions.installmentNumber}, ${transactions.installmentCount}, ${transactions.billMonth}) is distinct from (excluded.installment_number, excluded.installment_count, excluded.bill_month)`,
+        })
+        .returning({ inserted: sql<boolean>`(xmax = 0)` });
+      if (row?.inserted) transactionsImported += 1;
     }
   }
 
