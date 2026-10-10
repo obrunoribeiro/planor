@@ -152,3 +152,19 @@ export function detectRecurrences(transactions: RecurrenceTransaction[], now: Da
 
   return result.sort((a, b) => b.amountCents - a.amountCents);
 }
+
+export type PriceChange = { fromCents: AmountCents; toCents: AmountCents; at: string; pct: number };
+
+/** Último reajuste a partir do `priceHistory` (§6.6: selo "Subiu 10%" e "Último reajuste
+ * R$ 34,90 → R$ 39,90"). Nulo se o valor nunca mudou. */
+export function latestPriceChange(history: readonly { amountCents: AmountCents; at: string }[]): PriceChange | null {
+  if (history.length < 2) return null;
+  const previous = history[history.length - 2]!;
+  const last = history[history.length - 1]!;
+  return {
+    fromCents: previous.amountCents,
+    toCents: last.amountCents,
+    at: last.at,
+    pct: Math.round(((last.amountCents - previous.amountCents) / previous.amountCents) * 100),
+  };
+}

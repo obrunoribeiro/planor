@@ -508,6 +508,7 @@ Exemplo: 6.500,00 − 3.910,10 − 1.341,00 = **1.248,90**.
 | `charge_upcoming` | 3 dias antes de assinatura ou fixo | Detalhe da assinatura |
 | `subscription_price_up` | Reajuste detectado | Lista de assinaturas |
 | `subscription_new` | Nova recorrência detectada | Detalhe |
+| `subscription_charged_after_cancel` | Cobrança de uma assinatura marcada como "Já cancelei" | Detalhe da assinatura |
 | `unused_subscription_reminder` | Marcada como sem uso, 3 dias antes da cobrança | Detalhe |
 | `unusual_spend` | Gasto fora do padrão | Detalhe da transação |
 | `installment_new` | Nova compra parcelada | Detalhe da parcela |

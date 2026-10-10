@@ -343,6 +343,17 @@ protótipo do Figma.
   pago" = total − falta (o banco arredonda a 1ª parcela, e o outro jeito deixava centavos). Na
   conta do Bruno: 9 parcelamentos, R$ 652,02/mês, falta R$ 513,20. Gradientes `resumoParcelas` e
   `dicaIa` capturados do Figma pro `packages/ui`.
+- **Telas de Assinaturas (§6.6, Figma 31:577, 31:676, 49:1179, 49:1212, 49:1245)** —
+  `apps/mobile/app/futuro/assinaturas.tsx` (por mês/por ano, aviso das marcadas sem uso com a
+  economia, selos "Sem uso"/"Subiu X%", ordenar) e `apps/mobile/app/futuro/assinatura/[id].tsx`
+  (próxima cobrança, cartão, assinante desde, pago no ano, último reajuste, como cancelar, "Já
+  cancelei"/"Ainda está ativa" e "Você usa esse serviço?"). `GET /future/subscriptions` e
+  `PATCH /subscriptions/:id` (eram stubs); cancelar/desfazer reenfileira o pipeline pra recalcular
+  comprometido e "a vencer". Coluna nova `recurrences.cancelled_at` (migração
+  `0006_slippery_silver_centurion.sql`, já aplicada): cobrança depois do "Já cancelei" vira
+  alerta `subscription_charged_after_cancel` (tipo novo, registrado no CONTEXTO §6.9).
+  `latestPriceChange` em `packages/shared` (com teste). Testado com a conta real do Bruno:
+  cancelar o Melimais tirou R$ 19,90 do comprometido de novembro, desfazer devolveu.
 - **Rótulos das barras do "Já comprometido" na Home** mostravam reais ÷ 10 ("234" pra R$ 2.340);
   agora reais inteiros, como no Figma (25:197). Também corrigidas chaves React repetidas no card
   de parcelas/assinaturas da Home ("3/3" aparecia duas vezes).
@@ -364,7 +375,12 @@ protótipo do Figma.
 - Parcelas: "Editar parcelamento" (Figma 49:1137 — nome, categoria, aviso antes da última,
   "Já quitei antecipado") e o filtro do topo ("Filtrar compromissos", 49:1095). Os valores das
   linhas do bloco do mês no Futuro ainda usam `formatCents` e não obedecem ao olho.
-- Telas de Assinaturas e Fixos recorrentes (§6.6) — próximos PRs.
+- Tela de Fixos recorrentes e "Nova conta fixa" (§6.6) — próximo PR.
+- Assinaturas: "Me lembrar 3 dias antes da cobrança" (Figma 49:1269) e o lembrete de 30 dias do
+  "Uso pouco" esperam o push (§6.9) — sem ele, "Lembrete criado" seria mentira. O alerta de
+  cobrança depois do cancelamento só aparece no contador do sino (a central de alertas ainda não
+  existe). Item "Marcar assinaturas sem uso" no plano da semana: entra quando este PR e o do
+  plano estiverem na `main`.
 - Passos 6–8 (fixo/variável pela recorrência, fora do padrão, uso de assinaturas), telas de Parcelas,
   Assinaturas e Fixos (§6.6; `/future/installments` etc. ainda são stubs), alertas e push, IA.
 - "Atualizar agora" leva ~1 min na conta do Bruno (1.135 transações): a sincronização grava uma
@@ -391,6 +407,12 @@ protótipo do Figma.
   objetivos do onboarding ainda não são coletados. "Segurar [categoria]" vai até domingo (fim da
   semana do plano), não "até sexta" como no exemplo do Figma, e é o usuário que marca: só dá pra
   saber se ficou dentro do limite quando a semana acaba, e aí já é outro plano.
+- **Assinaturas: "Assinante desde" e "Pago em [ano]" contam só a série detectada** — se o preço
+  subiu mais de 50% de uma vez ou houve um intervalo maior que 35 dias, a série recomeça ali
+  (Spotify do Bruno: "desde março de 2026", R$ 286,30 pagos em 2026, sem as duas cobranças de
+  R$ 31,90 de jan/fev). O passo a passo "Como cancelar" é genérico (o Figma também é); não há
+  instrução por serviço. Data prevista que passou sem cobrança aparece como "não cobrou em
+  27/09" / "Atrasada", não "renova".
 - **Comprometido não inclui o mês corrente** — começa no mês seguinte (o mês corrente é "a vencer",
   outro número do §2). Recorrência mensal (até 35 dias) cobra uma vez por mês a partir do mês da
   próxima cobrança — somar o intervalo em dias faria um mês "pular" de vez em quando;

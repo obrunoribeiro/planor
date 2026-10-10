@@ -7,7 +7,7 @@
 // fixos recorrentes) e passo 9 (`monthly_summaries` e `committed_by_month`). Ficam pra depois:
 // fixo/variável pela recorrência (6), fora do padrão (7) e plano da semana (9) — ver PROGRESSO.md.
 import { and, eq, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
-import { accounts, categories, categoryRules, committedByMonth, installmentPlans, monthlySummaries, recurrences, transactions } from '@planor/db';
+import { accounts, alerts, categories, categoryRules, committedByMonth, installmentPlans, monthlySummaries, recurrences, transactions } from '@planor/db';
 import {
   buildMonthlySummaries,
   categorizeTransaction,
@@ -331,6 +331,29 @@ async function syncRecurrences(userId: string, now: Date): Promise<{ recurrences
           .update(recurrences)
           .set({ ...values, status: match.status === 'cancelled_by_user' ? match.status : 'active' })
           .where(eq(recurrences.id, match.id));
+        // §6.6: "Já cancelei" tira da previsão e confirma se a cobrança voltar — cobrança depois
+        // do cancelamento vira alerta (uma vez por cobrança).
+        if (match.status === 'cancelled_by_user' && match.cancelledAt && found.lastChargeAt > match.cancelledAt) {
+          const chargedAt = found.lastChargeAt.toISOString();
+          const [already] = await tx
+            .select({ id: alerts.id })
+            .from(alerts)
+            .where(
+              and(
+                eq(alerts.userId, userId),
+                eq(alerts.type, 'subscription_charged_after_cancel'),
+                sql`${alerts.payload}->>'recurrenceId' = ${match.id}`,
+                sql`${alerts.payload}->>'chargedAt' = ${chargedAt}`,
+              ),
+            );
+          if (!already) {
+            await tx.insert(alerts).values({
+              userId,
+              type: 'subscription_charged_after_cancel',
+              payload: { recurrenceId: match.id, merchantName: found.merchantName, amountCents: found.amountCents, chargedAt },
+            });
+          }
+        }
       } else {
         recurrenceId = (await tx.insert(recurrences).values({ userId, kind: found.kind, ...values }).returning())[0]!.id;
       }
