@@ -1,6 +1,6 @@
 // Conexão bancária (Open Finance / Pluggy), importação de fatura e webhooks — CONTEXTO.md §6.2, §8.
 import { and, eq, inArray } from 'drizzle-orm';
-import { accounts, connections, institutions, transactions } from '@planor/db';
+import { accounts, connections, creditCards, institutions, transactions } from '@planor/db';
 import { daysUntilSaoPaulo, parseOfx } from '@planor/shared';
 import type { FastifyInstance } from 'fastify';
 import { env } from '../env';
@@ -91,6 +91,7 @@ export async function connectionRoutes(app: FastifyInstance) {
       .select({
         id: connections.id,
         status: connections.status,
+        authorizedAt: connections.authorizedAt,
         consentExpiresAt: connections.consentExpiresAt,
         lastSyncAt: connections.lastSyncAt,
         errorCode: connections.errorCode,
@@ -110,8 +111,11 @@ export async function connectionRoutes(app: FastifyInstance) {
             type: accounts.type,
             name: accounts.name,
             balanceCents: accounts.balanceCents,
+            // No cartão, `balance_cents` é o limite usado; a fatura vem de `credit_cards`.
+            currentBillCents: creditCards.currentBillCents,
           })
           .from(accounts)
+          .leftJoin(creditCards, eq(creditCards.accountId, accounts.id))
           .where(and(eq(accounts.userId, userId), inArray(accounts.connectionId, rows.map((r) => r.id))))
       : [];
 

@@ -113,13 +113,17 @@ export type ConnectionAccount = {
   id: string;
   type: 'checking' | 'savings' | 'credit_card';
   name: string;
-  /** Conta: saldo. Cartão: fatura atual (saldo devedor, positivo). */
+  /** Conta: saldo. Cartão: limite usado (inclui parcelas de faturas futuras). */
   balanceCents: number;
+  /** Só no cartão: fatura aberta. Nulo até a primeira sincronização depois desse campo existir. */
+  currentBillCents: number | null;
 };
 
 export type ConnectionListItem = {
   id: string;
   status: 'connected' | 'error' | 'disconnected' | 'consent_expired';
+  /** Quando o usuário autorizou o acesso (`createdAt` do item no Pluggy). */
+  authorizedAt: string | null;
   consentExpiresAt: string | null;
   /** Dias de calendário até o consentimento vencer (America/Sao_Paulo); negativo = já venceu. */
   consentDaysLeft: number | null;

@@ -1,0 +1,1 @@
+ALTER TABLE "credit_cards" ADD COLUMN "current_bill_cents" integer;

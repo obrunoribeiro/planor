@@ -28,7 +28,13 @@ function AccountRow({ account }: { account: ConnectionAccount }) {
         <Text style={styles.accountTitle}>{label.title}</Text>
         <Text style={styles.caption}>{label.caption}</Text>
       </View>
-      <Money style={styles.accountValue} cents={account.balanceCents} />
+      {account.type !== 'credit_card' ? (
+        <Money style={styles.accountValue} cents={account.balanceCents} />
+      ) : account.currentBillCents === null ? (
+        <Text style={styles.accountValue}>—</Text>
+      ) : (
+        <Money style={styles.accountValue} cents={account.currentBillCents} />
+      )}
     </View>
   );
 }

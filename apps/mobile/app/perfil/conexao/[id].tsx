@@ -59,6 +59,7 @@ export default function ConexaoScreen() {
         : `Conectado${connection.lastSyncAt ? ` · atualizado ${relativeTimeLabel(connection.lastSyncAt)}` : ''}`;
 
   const rows = [
+    ...(connection.authorizedAt ? [{ label: 'Autorizado em', value: longDateFromIso(connection.authorizedAt) }] : []),
     ...(connection.consentExpiresAt ? [{ label: 'Válido até', value: longDateFromIso(connection.consentExpiresAt) }] : []),
     { label: 'Dados', value: 'Cadastro, conta, cartão e transações' },
     { label: 'Finalidade', value: 'Organizar suas finanças' },
