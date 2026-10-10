@@ -4,6 +4,7 @@ import { aiRoutes } from './ai';
 import { alertRoutes } from './alerts';
 import { categoryRoutes } from './categories';
 import { connectionRoutes } from './connections';
+import { forecastRoutes } from './forecast';
 import { futureRoutes } from './future';
 import { goalRoutes } from './goals';
 import { growthRoutes } from './growth';
@@ -20,6 +21,7 @@ export async function registerRoutes(app: FastifyInstance) {
   await app.register(meRoutes);
   await app.register(settingsRoutes);
   await app.register(homeRoutes);
+  await app.register(forecastRoutes);
   await app.register(categoryRoutes);
   await app.register(accountRoutes);
   await app.register(connectionRoutes);

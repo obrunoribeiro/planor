@@ -387,6 +387,18 @@ export const icons = {
       { d: 'M11.2667 7.475V11.8083M11.2667 15.0583H11.2775' },
     ],
   }),
+  entrada: def({
+    width: 9.3,
+    height: 9.3,
+    strokeWidth: 1.8,
+    paths: [{ d: 'M8.4 0.9L0.9 8.4M6.9 8.4H0.9V2.4' }],
+  }),
+  editar: def({
+    width: 13.05,
+    height: 13.05,
+    strokeWidth: 1.8,
+    paths: [{ d: 'M0.9 12.15H3.9L12.15 3.9L9.15 0.9L0.9 9.15V12.15Z' }],
+  }),
   fechar: def({
     width: 10.35,
     height: 10.35,

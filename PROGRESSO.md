@@ -314,6 +314,13 @@ protótipo do Figma.
   R$ 1.814,66, sobra R$ 4.631,07. Vale 0 enquanto a última fatura fechada não venceu (aí a
   diferença seria a fatura fechada, não compra nova) e quando não há lançamento conhecido na
   fatura aberta.
+- **"Como calculamos a sobra" (§6.4, Figma 83:2405)** — tela nova `apps/mobile/app/sobra.tsx`,
+  aberta ao tocar no valor da sobra na Home. `GET /forecast/leftover` (rota nova,
+  `apps/api/src/routes/forecast.ts`) devolve a mesma conta da Home aberta em parcelas: renda, já
+  gasto (com as compras não detalhadas), a vencer por tipo e a sobra. A consulta do "a vencer"
+  saiu da rota da Home pra `apps/api/src/services/dueThisMonth.ts`, usada pelas duas.
+  "Ajustar minha renda" abre a sheet de Editar perfil. Ícones `entrada` e `editar` adicionados ao
+  `packages/ui` (paths reais do Figma).
 - **Rótulos das barras do "Já comprometido" na Home** mostravam reais ÷ 10 ("234" pra R$ 2.340);
   agora reais inteiros, como no Figma (25:197). Também corrigidas chaves React repetidas no card
   de parcelas/assinaturas da Home ("3/3" aparecia duas vezes).
@@ -332,7 +339,6 @@ protótipo do Figma.
 - Assinaturas: "cobrança duplicada" (§6.3, passo 5) ainda não é detectada — entra junto com os
   alertas. O plano da semana da Home ainda é do seed e cita assinaturas fictícias ("Streaming de
   vídeo e App de idiomas").
-- "Como calculamos a sobra" (`/sobra`, `GET /forecast/leftover`) ainda não existe.
 - Passos 6–8 (fixo/variável pela recorrência, fora do padrão, uso de assinaturas), plano da semana, telas de Parcelas,
   Assinaturas e Fixos (§6.6; `/future/installments` etc. ainda são stubs), alertas e push, IA.
 - "Atualizar agora" leva ~1 min na conta do Bruno (1.135 transações): a sincronização grava uma
