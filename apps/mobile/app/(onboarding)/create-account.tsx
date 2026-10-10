@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardDismissView } from '@/components/KeyboardDismissView';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { goBack } from '@/lib/navigation';
 
 export default function CreateAccountScreen() {
   const { signInWithOtp, signInWithGoogle } = useAuth();
@@ -47,7 +48,7 @@ export default function CreateAccountScreen() {
 
       <KeyboardDismissView>
         <View style={styles.content}>
-          <OnboardingHeader step={3} totalSteps={5} onBack={() => router.back()} />
+          <OnboardingHeader step={3} totalSteps={5} onBack={() => goBack('/welcome')} />
 
           <View style={styles.texts}>
             <Text style={styles.title}>Crie sua conta</Text>

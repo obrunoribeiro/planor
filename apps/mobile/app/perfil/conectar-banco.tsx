@@ -6,11 +6,12 @@
 // Com `?connectionId=` abre em modo "atualizar conexão existente" — é o fluxo de Renovar acesso /
 // Reconectar (§6.2): o widget refaz o consentimento do mesmo item em vez de criar um novo.
 import { colors, EmptyState, ScreenHeader, Skeleton, space, typography } from '@planor/ui';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { PluggyConnect } from 'react-native-pluggy-connect';
 import { useCreateConnectTokenMutation, useSyncConnectionItemMutation } from '@/lib/api/queries';
+import { goBack } from '@/lib/navigation';
 
 export default function ConectarBancoScreen() {
   const { connectionId } = useLocalSearchParams<{ connectionId?: string }>();
@@ -30,7 +31,7 @@ export default function ConectarBancoScreen() {
     return (
       <View style={styles.screen}>
         <View style={styles.content}>
-          <ScreenHeader title={title} onBack={() => router.back()} />
+          <ScreenHeader title={title} onBack={() => goBack('/perfil')} />
           <Skeleton shape="bloco" width="100%" />
         </View>
       </View>
@@ -49,7 +50,7 @@ export default function ConectarBancoScreen() {
     return (
       <View style={styles.screen}>
         <View style={styles.content}>
-          <ScreenHeader title={title} onBack={() => router.back()} />
+          <ScreenHeader title={title} onBack={() => goBack('/perfil')} />
           <View style={styles.resultBox}>
             <Text style={styles.resultTitle}>{resultMessage}</Text>
           </View>
@@ -81,7 +82,7 @@ export default function ConectarBancoScreen() {
           });
         }}
         onError={({ message }) => setConnectError(message || 'Não foi possível conectar o banco.')}
-        onClose={() => router.back()}
+        onClose={() => goBack('/perfil')}
       />
       {isSyncing && (
         <View style={styles.syncingOverlay}>

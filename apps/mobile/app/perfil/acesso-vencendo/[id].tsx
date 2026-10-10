@@ -12,6 +12,7 @@ import { ScreenGlow } from '@/components/ScreenGlow';
 import { BankAvatar, expiresInLabel, InfoRows } from '@/features/contas/shared';
 import { useConnectionsQuery } from '@/lib/api/queries';
 import { longDateFromIso } from '@/lib/format';
+import { goBack } from '@/lib/navigation';
 
 export default function AcessoVencendoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -21,7 +22,7 @@ export default function AcessoVencendoScreen() {
     return (
       <View style={styles.screen}>
         <View style={styles.content}>
-          <ScreenHeader title="" onBack={() => router.back()} />
+          <ScreenHeader title="" onBack={() => goBack('/perfil/contas')} />
           <Skeleton shape="bloco" width="100%" />
         </View>
       </View>
@@ -38,7 +39,7 @@ export default function AcessoVencendoScreen() {
           title={isError ? 'Não deu pra carregar' : 'Conexão não encontrada'}
           text={isError ? 'Confira sua internet e tenta de novo.' : 'Ela pode ter sido desconectada.'}
           actionLabel={isError ? 'Tentar de novo' : 'Voltar'}
-          onAction={() => (isError ? refetch() : router.back())}
+          onAction={() => (isError ? refetch() : goBack('/perfil/contas'))}
         />
       </View>
     );
@@ -50,7 +51,7 @@ export default function AcessoVencendoScreen() {
     <View style={styles.screen}>
       <ScreenGlow tone="alerta" />
       <View style={styles.content}>
-        <ScreenHeader title={name} onBack={() => router.back()} />
+        <ScreenHeader title={name} onBack={() => goBack('/perfil/contas')} />
         <View style={styles.hero}>
           <BankAvatar name={name} size={72} />
           <Badge tone="alert" label={expiresInLabel(connection.consentDaysLeft)} />

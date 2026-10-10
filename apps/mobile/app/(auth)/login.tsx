@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardDismissView } from '@/components/KeyboardDismissView';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { goBack } from '@/lib/navigation';
 
 export default function LoginScreen() {
   const { signInWithOtp } = useAuth();
@@ -37,7 +38,7 @@ export default function LoginScreen() {
 
       <KeyboardDismissView>
         <View style={styles.content}>
-          <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityLabel="Voltar">
+          <Pressable onPress={() => goBack('/welcome')} style={styles.backButton} accessibilityLabel="Voltar">
             <Icon name="voltar" size={20} color={colors.dark.text.primary} />
           </Pressable>
 

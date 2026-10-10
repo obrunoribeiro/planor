@@ -15,6 +15,7 @@ import { TransactionRow } from '@/features/gastos/TransactionRow';
 import { useCategoryDetailQuery } from '@/lib/api/queries';
 import { useHiddenValuesStore } from '@/lib/stores/useHiddenValuesStore';
 import { capitalize, dayTimeLabel, monthNamePtBR } from '@/lib/format';
+import { goBack } from '@/lib/navigation';
 import { formatCents } from '@planor/shared';
 
 const MAX_BAR_HEIGHT = 100;
@@ -42,7 +43,7 @@ export default function CategoriaScreen() {
     return (
       <View style={styles.screen}>
         <View style={styles.content}>
-          <ScreenHeader title="" onBack={() => router.back()} />
+          <ScreenHeader title="" onBack={() => goBack('/gastos')} />
           <Skeleton shape="bloco" width="100%" />
           <Skeleton shape="bloco" width="100%" />
         </View>
@@ -66,7 +67,7 @@ export default function CategoriaScreen() {
     <View style={styles.screen}>
       <ScreenGlow />
       <ScrollView contentContainerStyle={styles.content}>
-        <ScreenHeader title={data.category.name} onBack={() => router.back()} />
+        <ScreenHeader title={data.category.name} onBack={() => goBack('/gastos')} />
 
         <View style={styles.summary}>
           <LinearGradient colors={gradients.icone.colors} start={gradients.icone.start} end={gradients.icone.end} style={styles.iconTile}>

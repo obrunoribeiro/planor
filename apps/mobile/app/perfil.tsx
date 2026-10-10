@@ -14,6 +14,7 @@ import { initialsFromName } from '@/lib/format';
 import { EditarPerfilSheet } from '@/features/perfil/EditarPerfilSheet';
 import { SegurancaSheet } from '@/features/perfil/SegurancaSheet';
 import { perfilMock } from '@/lib/mocks/perfil';
+import { goBack } from '@/lib/navigation';
 import type { Plan } from '@planor/shared';
 
 const PLAN_LABEL: Record<Plan, string> = {
@@ -80,7 +81,7 @@ export default function PerfilScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <ScreenHeader title="Perfil" onBack={() => router.back()} />
+        <ScreenHeader title="Perfil" onBack={() => goBack('/')} />
 
         <Pressable style={styles.userBlock} onPress={() => setEditVisible(true)}>
           <Avatar initials={initialsFromName(me.name)} size={80} />

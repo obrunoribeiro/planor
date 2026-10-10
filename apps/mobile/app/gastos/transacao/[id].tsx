@@ -4,13 +4,14 @@
 // (dependem de Fase 3/Fase 5 — ver PROGRESSO.md).
 import { formatCentsWithSign } from '@planor/shared';
 import { Button, colors, Dialog, EmptyState, ListItem, ScreenHeader, Skeleton, space, TextField, typography } from '@planor/ui';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MudarCategoriaSheet } from '@/features/gastos/MudarCategoriaSheet';
 import { TipoDeGastoSheet } from '@/features/gastos/TipoDeGastoSheet';
 import { dueDayMonthLabel } from '@/lib/format';
 import { useTransactionQuery, useUpdateTransactionMutation } from '@/lib/api/queries';
+import { goBack } from '@/lib/navigation';
 
 const EXPENSE_KIND_LABEL: Record<string, string> = { fixed: 'Fixo', variable: 'Variável' };
 
@@ -32,7 +33,7 @@ export default function TransacaoDetailScreen() {
     return (
       <View style={styles.screen}>
         <View style={styles.content}>
-          <ScreenHeader title="Transação" onBack={() => router.back()} />
+          <ScreenHeader title="Transação" onBack={() => goBack('/gastos/transacoes')} />
           <Skeleton shape="bloco" width="100%" />
           <Skeleton shape="bloco" width="100%" />
         </View>
@@ -55,7 +56,7 @@ export default function TransacaoDetailScreen() {
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <ScreenHeader title="Transação" onBack={() => router.back()} />
+        <ScreenHeader title="Transação" onBack={() => goBack('/gastos/transacoes')} />
 
         <View style={styles.summary}>
           <Text style={styles.merchant}>{title}</Text>
