@@ -13,6 +13,7 @@ import { ScreenGlow } from '@/components/ScreenGlow';
 import { BankAvatar, connectionUiState, InfoRows } from '@/features/contas/shared';
 import { useConnectionsQuery, useDisconnectConnectionMutation, useRefreshConnectionMutation } from '@/lib/api/queries';
 import { longDateFromIso, relativeTimeLabel } from '@/lib/format';
+import { goBack } from '@/lib/navigation';
 
 export default function ConexaoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,7 +26,7 @@ export default function ConexaoScreen() {
     return (
       <View style={styles.screen}>
         <View style={styles.content}>
-          <ScreenHeader title="Conexão" onBack={() => router.back()} />
+          <ScreenHeader title="Conexão" onBack={() => goBack('/perfil/contas')} />
           <Skeleton shape="bloco" width="100%" />
           <Skeleton shape="bloco" width="100%" />
         </View>
@@ -43,7 +44,7 @@ export default function ConexaoScreen() {
           title={isError ? 'Não deu pra carregar' : 'Conexão não encontrada'}
           text={isError ? 'Confira sua internet e tenta de novo.' : 'Ela pode ter sido desconectada.'}
           actionLabel={isError ? 'Tentar de novo' : 'Voltar'}
-          onAction={() => (isError ? refetch() : router.back())}
+          onAction={() => (isError ? refetch() : goBack('/perfil/contas'))}
         />
       </View>
     );
@@ -79,7 +80,7 @@ export default function ConexaoScreen() {
     <View style={styles.screen}>
       <ScreenGlow />
       <View style={styles.content}>
-        <ScreenHeader title="Conexão" onBack={() => router.back()} />
+        <ScreenHeader title="Conexão" onBack={() => goBack('/perfil/contas')} />
         <View style={styles.bank}>
           <BankAvatar name={connection.institutionName} size={72} />
           <Text style={styles.bankName}>{connection.institutionName}</Text>
@@ -112,7 +113,7 @@ export default function ConexaoScreen() {
         confirmLabel="Desconectar"
         onConfirm={() => {
           setConfirmVisible(false);
-          disconnect(connection.id, { onSuccess: () => router.back() });
+          disconnect(connection.id, { onSuccess: () => goBack('/perfil/contas') });
         }}
         onCancel={() => setConfirmVisible(false)}
       />

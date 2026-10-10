@@ -4,10 +4,10 @@
 import { ApiError } from '@/lib/api/client';
 import { Button, colors, EmptyState, Icon, ScreenHeader, Skeleton, space, typography } from '@planor/ui';
 import * as DocumentPicker from 'expo-document-picker';
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAccountsQuery, useImportOfxMutation } from '@/lib/api/queries';
+import { goBack } from '@/lib/navigation';
 
 type PickedFile = { uri: string; name: string; mimeType: string };
 
@@ -40,7 +40,7 @@ export default function ImportarFaturaScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.content}>
-        <ScreenHeader title="Importar fatura" onBack={() => router.back()} />
+        <ScreenHeader title="Importar fatura" onBack={() => goBack('/perfil')} />
 
         {isPending ? (
           <Skeleton shape="bloco" width="100%" />

@@ -13,6 +13,7 @@ import { SyncFailedSheet } from '@/features/contas/SyncFailedSheet';
 import { useConnectionsQuery, useRefreshConnectionMutation } from '@/lib/api/queries';
 import type { ConnectionAccount, ConnectionListItem } from '@/lib/api/types';
 import { dayMonthFromIso, monthYearShortFromIso, relativeTimeLabel } from '@/lib/format';
+import { goBack } from '@/lib/navigation';
 
 const ACCOUNT_LABEL: Record<ConnectionAccount['type'], { title: string; caption: string }> = {
   checking: { title: 'Conta corrente', caption: 'Saldo' },
@@ -110,7 +111,7 @@ export default function ContasScreen() {
   const header = (
     <ScreenHeader
       title="Contas e cartões"
-      onBack={() => router.back()}
+      onBack={() => goBack('/perfil')}
       action={
         <Pressable style={styles.headerAction} onPress={() => router.push('/perfil/conectar-banco')} accessibilityLabel="Conectar outro banco">
           <Icon name="mais" size={20} color={colors.dark.text.primary} />

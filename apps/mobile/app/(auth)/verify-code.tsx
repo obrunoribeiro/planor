@@ -1,12 +1,13 @@
 // Onboarding · 5 Código de verificação — CONTEXTO.md §6.1. Node 41:792 no Figma. Compartilhada
 // entre cadastro e login (ver CONTEXTO.md §5).
 import { Button, CodeInput, colors, GlowOrb, Icon, space, typography } from '@planor/ui';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyboardDismissView } from '@/components/KeyboardDismissView';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { goBack } from '@/lib/navigation';
 
 const RESEND_SECONDS = 60;
 // O Supabase desse projeto está configurado pra gerar código de 8 dígitos (o padrão da
@@ -55,7 +56,7 @@ export default function VerifyCodeScreen() {
 
       <KeyboardDismissView>
         <View style={styles.content}>
-          <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityLabel="Voltar">
+          <Pressable onPress={() => goBack('/welcome')} style={styles.backButton} accessibilityLabel="Voltar">
             <Icon name="voltar" size={20} color={colors.dark.text.primary} />
           </Pressable>
 

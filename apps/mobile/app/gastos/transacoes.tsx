@@ -10,6 +10,7 @@ import { TransactionRow } from '@/features/gastos/TransactionRow';
 import { dayGroupLabel } from '@/lib/format';
 import { useAccountsQuery, useCategoriesQuery, useTransactionsQuery } from '@/lib/api/queries';
 import type { TransactionListFilters, TransactionListItem } from '@/lib/api/types';
+import { goBack } from '@/lib/navigation';
 
 const TYPE_OPTIONS: { value: NonNullable<TransactionListFilters['type']>; label: string }[] = [
   { value: 'todas', label: 'Todas' },
@@ -68,7 +69,7 @@ export default function TransacoesScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.content}>
-        <ScreenHeader title="Transações" onBack={() => router.back()} />
+        <ScreenHeader title="Transações" onBack={() => goBack('/gastos')} />
 
         <View style={styles.topRow}>
           <Pressable style={styles.iconButton} accessibilityLabel="Buscar" onPress={() => setSearchVisible((v) => !v)}>

@@ -8,6 +8,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ScreenGlow } from '@/components/ScreenGlow';
 import { BankAvatar } from '@/features/contas/shared';
 import { useConnectionsQuery } from '@/lib/api/queries';
+import { goBack } from '@/lib/navigation';
 
 const SHARED_DATA: { icon: IconName; title: string; text: string }[] = [
   { icon: 'usuario', title: 'Dados cadastrais', text: 'Nome e CPF, para confirmar que a conta é sua' },
@@ -24,7 +25,7 @@ export default function RenovarAcessoScreen() {
     return (
       <View style={styles.screen}>
         <View style={styles.content}>
-          <ScreenHeader title="Renovar acesso" onBack={() => router.back()} />
+          <ScreenHeader title="Renovar acesso" onBack={() => goBack('/perfil/contas')} />
           <Skeleton shape="bloco" width="100%" />
         </View>
       </View>
@@ -41,7 +42,7 @@ export default function RenovarAcessoScreen() {
           title={isError ? 'Não deu pra carregar' : 'Conexão não encontrada'}
           text={isError ? 'Confira sua internet e tenta de novo.' : 'Ela pode ter sido desconectada.'}
           actionLabel={isError ? 'Tentar de novo' : 'Voltar'}
-          onAction={() => (isError ? refetch() : router.back())}
+          onAction={() => (isError ? refetch() : goBack('/perfil/contas'))}
         />
       </View>
     );
@@ -53,7 +54,7 @@ export default function RenovarAcessoScreen() {
     <View style={styles.screen}>
       <ScreenGlow />
       <ScrollView contentContainerStyle={styles.content}>
-        <ScreenHeader title="Renovar acesso" onBack={() => router.back()} />
+        <ScreenHeader title="Renovar acesso" onBack={() => goBack('/perfil/contas')} />
         <View style={styles.link}>
           <LinearGradient colors={gradients.marcaProfundo.colors} start={gradients.marcaProfundo.start} end={gradients.marcaProfundo.end} style={styles.planorTile}>
             <Logo size={34} />
