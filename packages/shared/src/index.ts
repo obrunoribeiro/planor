@@ -10,4 +10,5 @@ export * from './pipeline/normalize';
 export * from './pipeline/categorize';
 export * from './pipeline/monthlySummary';
 export * from './pipeline/installments';
+export * from './pipeline/recurrences';
 export * from './calculations/consentExpiry';

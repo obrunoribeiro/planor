@@ -35,9 +35,15 @@ export type CommittedMonth = {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MONTHLY_MAX_DAYS = 35; // mesma janela de 28 a 35 dias do §6.3, passo 5
 
-/** Meses (dentro de `months`) em que a recorrência cobra. */
+/** Meses (dentro de `months`) em que a recorrência cobra. Mensal (até 35 dias) cobra uma vez por
+ * mês a partir do mês da próxima cobrança — somar o intervalo em dias faria um mês "pular" de vez
+ * em quando (32 dias a partir de 27/09 pula dezembro). */
 function chargeMonths(recurrence: CommittedRecurrence, months: string[]): string[] {
-  if (!recurrence.nextChargeAt) return recurrence.cadenceDays <= MONTHLY_MAX_DAYS ? months : [];
+  if (recurrence.cadenceDays <= MONTHLY_MAX_DAYS) {
+    const from = recurrence.nextChargeAt ? monthKeySaoPaulo(recurrence.nextChargeAt) : months[0]!;
+    return months.filter((m) => m >= from);
+  }
+  if (!recurrence.nextChargeAt) return [];
 
   const last = months[months.length - 1]!;
   const hits = new Set<string>();

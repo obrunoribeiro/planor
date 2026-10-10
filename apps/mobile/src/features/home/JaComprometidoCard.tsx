@@ -59,7 +59,8 @@ export function JaComprometidoCard({ committed }: JaComprometidoCardProps) {
           return (
             <View key={month.label} style={styles.barColumn}>
               <Text style={[styles.barValue, isActive ? styles.barValueActive : null]}>
-                {hidden ? '•••' : Math.round(month.amountCents / 1000).toLocaleString('pt-BR')}
+                {/* Reais inteiros, como no Figma (25:197: "2.340", "1.980"). */}
+                {hidden ? '•••' : Math.round(month.amountCents / 100).toLocaleString('pt-BR')}
               </Text>
               <Bar height={barHeight} active={isActive} />
               <Text style={[styles.barLabel, isActive ? styles.barLabelActive : null]}>{month.label}</Text>
