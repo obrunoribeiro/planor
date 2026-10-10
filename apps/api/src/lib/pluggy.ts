@@ -61,6 +61,7 @@ export type PluggyItem = {
   connector: { id: number; name: string; imageUrl?: string };
   status: string;
   executionStatus: string;
+  createdAt: string;
   consentExpiresAt?: string;
   error?: { code: string; message: string } | null;
   /** O `clientUserId` que a gente passou ao criar o connect token — é o que garante, do lado do
@@ -140,6 +141,8 @@ export type PluggyTransaction = {
   descriptionRaw?: string | null;
   amount: number;
   type: 'DEBIT' | 'CREDIT';
+  /** Só em cartão de crédito. `billId` presente = já está numa fatura fechada. */
+  creditCardMetadata?: { billId?: string | null; billForecastDate?: string | null } | null;
 };
 
 /** `GET /transactions` (página/pageSize) foi descontinuado pelo Pluggy em favor de

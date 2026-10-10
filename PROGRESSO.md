@@ -9,7 +9,7 @@
 > **Regra (ver `CLAUDE.md`, Regra Nº 2): atualize este arquivo no mesmo commit que fecha ou avança
 > uma fase**, antes de abrir o PR — não depois.
 
-Última atualização: 2026-10-08.
+Última atualização: 2026-10-10.
 
 ---
 
@@ -197,7 +197,7 @@ protótipo do Figma.
 - **Contas e cartões e telas de conexão** (CONTEXTO.md §6.2, §6.10; Figma 34:785, 53:1306,
   53:1357, 83:2270, 83:2288, 83:2329):
   - `GET /connections` agora devolve as contas de cada conexão (saldo; no cartão, a fatura atual
-    = saldo devedor que o Pluggy devolve) e `consentDaysLeft` (mesma regra do job de
+    — ver "Decisões diferentes") e `authorizedAt` e `consentDaysLeft` (mesma regra do job de
     consentimento, calculada no servidor).
   - Telas novas: `app/perfil/contas.tsx` (lista por banco; card vermelho "Reconectar" quando
     venceu; toque numa conexão com erro abre a sheet "Não conseguimos atualizar"; vencendo em
@@ -265,11 +265,21 @@ protótipo do Figma.
   exemplo é Delivery) — a tela serve pra qualquer categoria, e "pedidos de Moradia" não faz
   sentido.
 
-- **Telas de conexão sem "Autorizado em" e sem "Lembrar amanhã"** (Figma 53:1306 e 83:2288) — o
-  banco não guarda a data em que o consentimento foi dado (só `consent_expires_at`) e o Pluggy
-  não devolve isso; mostrar "12 meses antes do vencimento" seria número inventado. "Lembrar
-  amanhã" precisaria guardar um adiamento em algum lugar, e o aviso de 1 dia já sai sozinho pelo
-  job. Se um dia guardarmos a data de autorização, as duas linhas voltam.
+- **"Autorizado em" é o `createdAt` do item no Pluggy** (coluna `connections.authorized_at`,
+  migração `0002_special_vin_gonzales.sql`, já aplicada), gravado a cada sincronização. Fica
+  vazio (linha some) até a conexão sincronizar de novo. Ao renovar o consentimento o item é o
+  mesmo, então a data continua a da primeira autorização.
+- **"Fatura atual" do cartão = limite usado − parcelas já lançadas pra faturas futuras**
+  (`currentBillCents` em `packages/shared/src/calculations/creditCardBill.ts`, com teste),
+  calculada na sincronização e gravada em `credit_cards.current_bill_cents` (migração
+  `0003_great_crystal.sql`, já aplicada). O `balance` que o Pluggy devolve pro cartão é o limite
+  usado, não a fatura — confirmado pelo Bruno em 2026-10-10: R$ 6.979,43 usado, fatura no app do
+  Nubank R$ 6.466,23, e a conta bateu no centavo (R$ 513,20 de parcelas nov/26–abr/27). Somar só
+  as transações da fatura aberta daria errado: o Pluggy ainda não tinha entregado R$ 1.410,07 de
+  compras recentes que já estavam no limite. Limitação: entre o fechamento e o pagamento, o
+  valor mostra fatura fechada + aberta.
+- **Sem "Lembrar amanhã" em "Acesso vencendo"** (Figma 83:2288) — precisaria guardar um adiamento
+  em algum lugar, e o aviso de 1 dia já sai sozinho pelo job.
 - **Sheet "Não conseguimos atualizar" diz "a cada 6 horas", não "a cada hora"** como no Figma
   (83:2270) — é o intervalo real do job `sync-all-connections` (§6.2 pede 4 a 6 horas).
 - **No plano Meu Pluggy, a conexão aparece com o nome "MeuPluggy", não com o do banco** — é o

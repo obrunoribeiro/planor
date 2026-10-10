@@ -30,6 +30,9 @@ export const connections = pgTable(
     status: connectionStatusEnum('status').notNull().default('connected'),
     /** Consentimento válido por até 12 meses — avisar com 7 e 1 dia de antecedência (§6.2). */
     consentExpiresAt: timestamp('consent_expires_at', { withTimezone: true }),
+    /** Quando o usuário autorizou o acesso — `createdAt` do item no Pluggy (§6.10, "Detalhe da
+     * conexão"). Nulo até a próxima sincronização pra conexões criadas antes desta coluna. */
+    authorizedAt: timestamp('authorized_at', { withTimezone: true }),
     lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
     errorCode: text('error_code'),
   },
@@ -65,6 +68,10 @@ export const creditCards = pgTable('credit_cards', {
   closingDay: integer('closing_day').notNull(),
   dueDay: integer('due_day').notNull(),
   limitCents: integer('limit_cents'),
+  /** Fatura atual (aberta), calculada a cada sincronização — `currentBillCents` em
+   * `packages/shared`. `accounts.balance_cents` do cartão é o limite usado, que inclui parcelas
+   * de faturas futuras. Nulo até a próxima sincronização. */
+  currentBillCents: integer('current_bill_cents'),
 });
 
 export const cardStatements = pgTable('card_statements', {
