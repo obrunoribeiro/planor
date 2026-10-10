@@ -2,21 +2,27 @@
 // Native, `react-native-pluggy-connect`) com um connectToken novo da nossa API. `includeSandbox`
 // só em dev: mostra o conector de testes "Pluggy Bank" (usuário `user-ok`, senha `password-ok`),
 // pra validar sem precisar de banco de verdade.
+//
+// Com `?connectionId=` abre em modo "atualizar conexão existente" — é o fluxo de Renovar acesso /
+// Reconectar (§6.2): o widget refaz o consentimento do mesmo item em vez de criar um novo.
 import { colors, EmptyState, ScreenHeader, Skeleton, space, typography } from '@planor/ui';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { PluggyConnect } from 'react-native-pluggy-connect';
 import { useCreateConnectTokenMutation, useSyncConnectionItemMutation } from '@/lib/api/queries';
 
 export default function ConectarBancoScreen() {
+  const { connectionId } = useLocalSearchParams<{ connectionId?: string }>();
+  const isRenewal = !!connectionId;
+  const title = isRenewal ? 'Renovar acesso' : 'Conectar banco';
   const { mutate: createToken, data: tokenData, isPending: isCreatingToken, isError: tokenError } = useCreateConnectTokenMutation();
   const { mutate: syncItem, isPending: isSyncing } = useSyncConnectionItemMutation();
   const [connectError, setConnectError] = useState<string | undefined>();
   const [resultMessage, setResultMessage] = useState<string | undefined>();
 
   useEffect(() => {
-    createToken();
+    createToken(connectionId);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só uma vez, ao abrir a tela
   }, []);
 
@@ -24,7 +30,7 @@ export default function ConectarBancoScreen() {
     return (
       <View style={styles.screen}>
         <View style={styles.content}>
-          <ScreenHeader title="Conectar banco" onBack={() => router.back()} />
+          <ScreenHeader title={title} onBack={() => router.back()} />
           <Skeleton shape="bloco" width="100%" />
         </View>
       </View>
@@ -34,7 +40,7 @@ export default function ConectarBancoScreen() {
   if (tokenError || !tokenData) {
     return (
       <View style={[styles.screen, styles.centered]}>
-        <EmptyState icon="aviso" title="Não deu pra abrir" text="Confira sua internet e tenta de novo." actionLabel="Tentar de novo" onAction={() => createToken()} />
+        <EmptyState icon="aviso" title="Não deu pra abrir" text="Confira sua internet e tenta de novo." actionLabel="Tentar de novo" onAction={() => createToken(connectionId)} />
       </View>
     );
   }
@@ -43,7 +49,7 @@ export default function ConectarBancoScreen() {
     return (
       <View style={styles.screen}>
         <View style={styles.content}>
-          <ScreenHeader title="Conectar banco" onBack={() => router.back()} />
+          <ScreenHeader title={title} onBack={() => router.back()} />
           <View style={styles.resultBox}>
             <Text style={styles.resultTitle}>{resultMessage}</Text>
           </View>
@@ -65,8 +71,13 @@ export default function ConectarBancoScreen() {
         theme="dark"
         onSuccess={({ item }) => {
           syncItem(item.id, {
-            onSuccess: (result) => setResultMessage(`${result.accountsSynced} contas conectadas, ${result.transactionsImported} transações importadas.`),
-            onError: () => setResultMessage('Banco conectado — as contas aparecem em instantes.'),
+            onSuccess: (result) =>
+              setResultMessage(
+                isRenewal
+                  ? 'Acesso renovado por mais 12 meses.'
+                  : `${result.accountsSynced} contas conectadas, ${result.transactionsImported} transações importadas.`,
+              ),
+            onError: () => setResultMessage(isRenewal ? 'Acesso renovado — os dados atualizam em instantes.' : 'Banco conectado — as contas aparecem em instantes.'),
           });
         }}
         onError={({ message }) => setConnectError(message || 'Não foi possível conectar o banco.')}

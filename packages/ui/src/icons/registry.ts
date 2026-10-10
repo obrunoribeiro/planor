@@ -276,6 +276,31 @@ export const icons = {
     strokeWidth: 1.8,
     paths: [{ d: 'M0.900096 4.725L6.6376 0.9L12.3751 4.725M2.1751 4.725V9.825M5.04385 4.725V9.825M8.23135 4.725V9.825M11.1001 4.725V9.825M0.900096 11.1H12.3751' }],
   }),
+  // Ícone/Mais, Ícone/Usuário e Ícone/Cartão: grupo do vetor exportado como SVG pela API do
+  // Figma (telas Contas e cartões / Renovar acesso); largura/altura = traço + metade do stroke.
+  mais: def({
+    width: 13.4667,
+    height: 13.4671,
+    strokeWidth: 1.8,
+    paths: [{ d: 'M6.73336 0.900391V12.5671M0.900024 6.73372H12.5667' }],
+  }),
+  usuario: def({
+    width: 13.8001,
+    height: 14.5504,
+    strokeWidth: 1.8,
+    paths: [
+      {
+        d: 'M6.90015 6.90039C8.557 6.90039 9.90015 5.55724 9.90015 3.90039C9.90015 2.24354 8.557 0.900391 6.90015 0.900391C5.24329 0.900391 3.90015 2.24354 3.90015 3.90039C3.90015 5.55724 5.24329 6.90039 6.90015 6.90039Z',
+      },
+      { d: 'M0.900146 13.6504C2.02515 10.6504 4.27515 9.15039 6.90015 9.15039C9.52515 9.15039 11.7751 10.6504 12.9001 13.6504' },
+    ],
+  }),
+  cartao: def({
+    width: 15.2999,
+    height: 9.3004,
+    strokeWidth: 1.8,
+    paths: [{ d: 'M0.899902 3.90039H14.3999M0.899902 0.900391H14.3999V8.40039H0.899902V0.900391Z' }],
+  }),
   upload: def({
     width: 10.725,
     height: 13.275,

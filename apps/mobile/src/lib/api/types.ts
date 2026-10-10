@@ -109,14 +109,25 @@ export type ImportResultResponse = {
   duplicates: number;
 };
 
+export type ConnectionAccount = {
+  id: string;
+  type: 'checking' | 'savings' | 'credit_card';
+  name: string;
+  /** Conta: saldo. Cartão: fatura atual (saldo devedor, positivo). */
+  balanceCents: number;
+};
+
 export type ConnectionListItem = {
   id: string;
   status: 'connected' | 'error' | 'disconnected' | 'consent_expired';
   consentExpiresAt: string | null;
+  /** Dias de calendário até o consentimento vencer (America/Sao_Paulo); negativo = já venceu. */
+  consentDaysLeft: number | null;
   lastSyncAt: string | null;
   errorCode: string | null;
   institutionName: string;
   institutionLogo: string | null;
+  accounts: ConnectionAccount[];
 };
 
 export type TransactionListItem = {

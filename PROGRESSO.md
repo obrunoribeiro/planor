@@ -194,17 +194,38 @@ protótipo do Figma.
     (`GET /alerts`) continua stub: por enquanto os alertas novos só aparecem no contador do sino
     da Home.
 
+- **Contas e cartões e telas de conexão** (CONTEXTO.md §6.2, §6.10; Figma 34:785, 53:1306,
+  53:1357, 83:2270, 83:2288, 83:2329):
+  - `GET /connections` agora devolve as contas de cada conexão (saldo; no cartão, a fatura atual
+    = saldo devedor que o Pluggy devolve) e `consentDaysLeft` (mesma regra do job de
+    consentimento, calculada no servidor).
+  - Telas novas: `app/perfil/contas.tsx` (lista por banco; card vermelho "Reconectar" quando
+    venceu; toque numa conexão com erro abre a sheet "Não conseguimos atualizar"; vencendo em
+    até 7 dias leva pra "Acesso vencendo"), `app/perfil/conexao/[id].tsx` (status, validade,
+    dados, finalidade, "Atualizar agora" e "Desconectar" com diálogo),
+    `app/perfil/acesso-vencendo/[id].tsx` e `app/perfil/renovar/[id].tsx`. O Perfil abre a lista
+    pelo item "Contas e cartões". Rotas novas registradas no CONTEXTO.md §5.
+  - Renovar/Reconectar reaproveita `conectar-banco.tsx` com `?connectionId=` (widget do Pluggy
+    em modo atualização do mesmo item).
+  - **Falha de segurança corrigida:** `POST /connections/token` aceitava um `itemId` cru do
+    cliente sem conferir o dono — dava pra abrir o widget em modo atualização sobre o item de
+    outra pessoa. Agora recebe `connectionId` e resolve o item no servidor filtrando pelo usuário
+    (404 se não for dele). Testado via HTTP com sessão real dos dois lados.
+  - `packages/ui`: `SecondaryButton` novo (Botão/Secundário) e ícones `mais`, `usuario`, `cartao`
+    (paths reais exportados do Figma).
+  - `apiFetch` (mobile) não manda mais `Content-Type: application/json` sem corpo (o Fastify
+    recusava o DELETE com 400) e aceita resposta 204.
+
 **Falta:**
 - Login com Apple — precisa do Apple Developer Program (US$99/ano), que ainda não existe.
 - Segurança: biometria, bloqueio automático ao sair do app, trocar e-mail e aparelhos conectados
   — só "Ocultar valores ao abrir" é real por enquanto (ver acima).
-- Pluggy: validado ponta a ponta (ver "Feito" acima). O que falta em volta disso: tela de lista
-  "Contas e cartões" com detalhe de cada conexão (CONTEXTO.md §6.10) — hoje só o contador no card
-  do plano usa dado real, a lista propriamente dita continua mock; avisos de consentimento
-  vencendo — o alerta já é gerado (ver "Feito"), falta a tela "Acesso vencendo" e "Renovar
-  acesso" (connect token com `itemId`, já suportado pela API); eventos `transactions/*` do webhook (hoje só
-  `item/*` é processado — ver "Decisões diferentes"); limpar a conexão duplicada vazia que sobrou dos testes
-  (sem urgência, é dado de dev).
+- Pluggy: validado ponta a ponta, e as telas de Contas e cartões existem (ver "Feito"). O que
+  falta em volta disso: eventos `transactions/*` do webhook (hoje só
+  `item/*` é processado — ver "Decisões diferentes"); limpar as conexões "MeuPluggy" que sobraram dos testes na
+  conta do Bruno (hoje são 3: duas ativas que dividiram as contas entre si — cartão numa, conta
+  corrente na outra — e uma abandonada com `USER_INPUT_TIMEOUT`; aparecem como 3 cards em
+  Contas e cartões). Dado de dev, sem urgência; não apaguei sem confirmar.
 - Importar fatura em **PDF** — precisa de extração de texto + LLM pra estruturar em JSON
   validado com zod (CONTEXTO.md §6.2), e o provedor de IA final ainda é decisão em aberto
   (CONTEXTO.md §15.6). `POST /imports` já devolve `501` com uma mensagem clara pra esse caso.
@@ -229,6 +250,19 @@ protótipo do Figma.
 ---
 
 ## Decisões diferentes do `CONTEXTO.md` original (e por quê)
+
+- **Telas de conexão sem "Autorizado em" e sem "Lembrar amanhã"** (Figma 53:1306 e 83:2288) — o
+  banco não guarda a data em que o consentimento foi dado (só `consent_expires_at`) e o Pluggy
+  não devolve isso; mostrar "12 meses antes do vencimento" seria número inventado. "Lembrar
+  amanhã" precisaria guardar um adiamento em algum lugar, e o aviso de 1 dia já sai sozinho pelo
+  job. Se um dia guardarmos a data de autorização, as duas linhas voltam.
+- **Sheet "Não conseguimos atualizar" diz "a cada 6 horas", não "a cada hora"** como no Figma
+  (83:2270) — é o intervalo real do job `sync-all-connections` (§6.2 pede 4 a 6 horas).
+- **No plano Meu Pluggy, a conexão aparece com o nome "MeuPluggy", não com o do banco** — é o
+  conector que o Pluggy devolve no item. Some quando migrarmos pra um plano com conectores
+  diretos (§15.1).
+- **Selo "Vence em N dias" sem o ícone de alerta** (Figma 83:2288) — o `Badge` do packages/ui
+  ainda não aceita ícone; diferença pequena, fica pra quando o Badge ganhar essa variante.
 
 - **No plano "Meu Pluggy", a atualização automática a cada 4-6h não consegue forçar o banco** —
   o Pluggy responde 400 "MeuPluggy item cant be updated" ao `PATCH /items/{id}` (confirmado em

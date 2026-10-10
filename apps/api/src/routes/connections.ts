@@ -1,7 +1,7 @@
 // Conexão bancária (Open Finance / Pluggy), importação de fatura e webhooks — CONTEXTO.md §6.2, §8.
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { accounts, connections, institutions, transactions } from '@planor/db';
-import { parseOfx } from '@planor/shared';
+import { daysUntilSaoPaulo, parseOfx } from '@planor/shared';
 import type { FastifyInstance } from 'fastify';
 import { env } from '../env';
 import { requireUserId } from '../lib/auth';
@@ -34,7 +34,20 @@ export async function connectionRoutes(app: FastifyInstance) {
     const userId = await requireUserId(request, reply);
     if (!userId) return;
 
-    const { itemId } = (request.body as { itemId?: string } | null) ?? {};
+    // `connectionId` = renovar/reconectar uma conexão existente (widget em modo atualização,
+    // §6.2). Recebe o id NOSSO e resolve o item do Pluggy aqui, filtrando pelo usuário — nunca um
+    // `itemId` cru do cliente, que deixaria abrir o widget sobre o item de outra pessoa.
+    const { connectionId } = (request.body as { connectionId?: string } | null) ?? {};
+    let itemId: string | undefined;
+    if (connectionId) {
+      const [connection] = await db
+        .select({ itemId: connections.aggregatorItemId })
+        .from(connections)
+        .where(and(eq(connections.id, connectionId), eq(connections.userId, userId)));
+      if (!connection) return reply.code(404).send({ error: 'connection_not_found' });
+      itemId = connection.itemId;
+    }
+
     try {
       const accessToken = await createConnectToken({ itemId, clientUserId: userId });
       return { accessToken };
@@ -66,11 +79,15 @@ export async function connectionRoutes(app: FastifyInstance) {
     }
   });
 
+  // Contas e cartões (§6.10): cada conexão com as contas dela. Pro cartão, `balanceCents` é a
+  // fatura atual (o Pluggy devolve o saldo devedor do cartão como `balance`). `consentDaysLeft`
+  // usa a mesma regra do job `consent-expiry-check` (dias de calendário em America/Sao_Paulo) —
+  // o app só exibe.
   app.get('/connections', async (request, reply) => {
     const userId = await requireUserId(request, reply);
     if (!userId) return;
 
-    return db
+    const rows = await db
       .select({
         id: connections.id,
         status: connections.status,
@@ -82,7 +99,32 @@ export async function connectionRoutes(app: FastifyInstance) {
       })
       .from(connections)
       .innerJoin(institutions, eq(institutions.id, connections.institutionId))
-      .where(eq(connections.userId, userId));
+      .where(eq(connections.userId, userId))
+      .orderBy(institutions.name);
+
+    const accountRows = rows.length
+      ? await db
+          .select({
+            id: accounts.id,
+            connectionId: accounts.connectionId,
+            type: accounts.type,
+            name: accounts.name,
+            balanceCents: accounts.balanceCents,
+          })
+          .from(accounts)
+          .where(and(eq(accounts.userId, userId), inArray(accounts.connectionId, rows.map((r) => r.id))))
+      : [];
+
+    const now = new Date();
+    return rows.map((row) => ({
+      ...row,
+      consentDaysLeft: row.consentExpiresAt ? daysUntilSaoPaulo(row.consentExpiresAt, now) : null,
+      // Conta corrente/poupança primeiro, cartão depois — a ordem do card no Figma.
+      accounts: accountRows
+        .filter((a) => a.connectionId === row.id)
+        .sort((a, b) => Number(a.type === 'credit_card') - Number(b.type === 'credit_card'))
+        .map(({ connectionId: _connectionId, ...account }) => account),
+    }));
   });
 
   app.post('/connections/:id/sync', async (request, reply) => {

@@ -34,6 +34,8 @@ export { RevealScrollView } from './RevealScrollView';
 export type { RevealScrollViewProps } from './RevealScrollView';
 export { ScreenHeader } from './ScreenHeader';
 export type { ScreenHeaderProps } from './ScreenHeader';
+export { SecondaryButton } from './SecondaryButton';
+export type { SecondaryButtonProps } from './SecondaryButton';
 export { Sheet } from './Sheet';
 export type { SheetProps } from './Sheet';
 export { Skeleton, SkeletonStatic } from './Skeleton';
