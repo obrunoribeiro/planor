@@ -2,7 +2,7 @@
 //
 // `dueUntilMonthEndCents` (parcelas + assinaturas + fixos que ainda vencem este mês) sai de
 // `services/dueThisMonth.ts`. `manual_recurring_bills` ("Nova conta fixa") ainda não tem tela.
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import {
   alerts,
   committedByMonth,
@@ -11,13 +11,13 @@ import {
   recurrences,
   transactions,
   users,
-  weeklyPlans,
 } from '@planor/db';
 import { monthAbbrevPtBR, previousMonthKey, projectedLeftover, trendVsPreviousPct } from '@planor/shared';
 import type { FastifyInstance } from 'fastify';
 import { requireUserId } from '../lib/auth';
 import { db } from '../lib/db';
 import { dueThisMonth } from '../services/dueThisMonth';
+import { currentWeeklyPlan } from '../services/weeklyPlan';
 import { undetailedSpendingCents } from '../services/undetailedSpending';
 
 function currentMonthSaoPaulo(): string {
@@ -31,15 +31,6 @@ function currentMonthSaoPaulo(): string {
   const month = parts.find((p) => p.type === 'month')!.value;
   return `${year}-${month}`;
 }
-
-type WeeklyPlanItem = {
-  type: string;
-  title: string;
-  description: string;
-  actionRoute: string;
-  completed: boolean;
-  completedAutomatically: boolean;
-};
 
 /** Gasto acumulado por dia do mês (saídas, sem ocultas nem transferências) — vira a Sparkline do
  * card "Gasto do mês". Dado real, calculado na hora a partir das transações deste mês. */
@@ -122,13 +113,8 @@ export async function homeRoutes(app: FastifyInstance) {
     }));
     const nextMonth = committedRows[0];
 
-    const [latestWeeklyPlan] = await db
-      .select()
-      .from(weeklyPlans)
-      .where(eq(weeklyPlans.userId, userId))
-      .orderBy(desc(weeklyPlans.weekStart))
-      .limit(1);
-    const weeklyItems = (latestWeeklyPlan?.items as WeeklyPlanItem[] | undefined) ?? [];
+    const weeklyPlan = await currentWeeklyPlan(userId);
+    const weeklyItems = weeklyPlan.items;
 
     const activeSubscriptions = await db
       .select()
@@ -170,6 +156,7 @@ export async function homeRoutes(app: FastifyInstance) {
           }
         : null,
       weeklyPlan: {
+        label: weeklyPlan.label,
         doneCount: weeklyItems.filter((item) => item.completed).length,
         totalCount: weeklyItems.length,
         items: weeklyItems,

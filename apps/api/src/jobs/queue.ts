@@ -7,8 +7,9 @@
 //   - `sync-all-connections` (a cada 6h): pede atualização de toda conexão ativa (§6.2, "a cada
 //     4 a 6 horas");
 //   - `consent-expiry-check` (diário, 9h): avisa consentimento vencendo e marca os vencidos;
-//   - `process-transactions`: pipeline do §6.3 (normaliza, categoriza, recalcula agregados).
-// O resto da tabela do §9 (alertas, plano da semana, push...) ainda não existe — ver PROGRESSO.md.
+//   - `process-transactions`: pipeline do §6.3 (normaliza, categoriza, recalcula agregados);
+//   - `weekly-plan` (segunda, 6h): gera o plano da semana (§6.4).
+// O resto da tabela do §9 (alertas, push...) ainda não existe — ver PROGRESSO.md.
 import PgBoss from 'pg-boss';
 import { env } from '../env';
 
@@ -17,6 +18,7 @@ export const QUEUES = {
   syncAllConnections: 'sync-all-connections',
   consentExpiryCheck: 'consent-expiry-check',
   processTransactions: 'process-transactions',
+  weeklyPlan: 'weekly-plan',
 } as const;
 
 export type SyncConnectionJob = { userId: string; itemId: string };
@@ -62,6 +64,8 @@ export function getBoss(): Promise<PgBoss> {
     await boss.createQueue(QUEUES.consentExpiryCheck, { name: QUEUES.consentExpiryCheck, policy: 'singleton' });
     await boss.schedule(QUEUES.syncAllConnections, '0 */6 * * *', {}, { tz: TZ });
     await boss.schedule(QUEUES.consentExpiryCheck, '0 9 * * *', {}, { tz: TZ });
+    await boss.createQueue(QUEUES.weeklyPlan, { name: QUEUES.weeklyPlan, policy: 'singleton' });
+    await boss.schedule(QUEUES.weeklyPlan, '0 6 * * 1', {}, { tz: TZ });
     return boss;
   })().catch((err) => {
     bossPromise = null; // deixa tentar de novo na próxima chamada

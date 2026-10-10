@@ -16,6 +16,7 @@ import type {
   TransactionDetailResponse,
   TransactionListFilters,
   TransactionListItem,
+  WeeklyPlanResponse,
 } from './types';
 
 function transactionListQueryString(filters: TransactionListFilters): string {
@@ -68,6 +69,33 @@ export function useFutureTimelineQuery() {
     queryKey: ['future-timeline'],
     queryFn: () => apiFetch<FutureTimelineResponse>('/future/timeline', { accessToken: accessToken! }),
     enabled: !!accessToken,
+  });
+}
+
+export function useWeeklyPlanQuery() {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['weekly-plan'],
+    queryFn: () => apiFetch<WeeklyPlanResponse>('/weekly-plan', { accessToken: accessToken! }),
+    enabled: !!accessToken,
+  });
+}
+
+/** Caixa de seleção do plano da semana (card da Home e tela do plano). */
+export function useToggleWeeklyPlanItemMutation() {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ index, completed }: { index: number; completed: boolean }) =>
+      apiFetch<WeeklyPlanResponse>(`/weekly-plan/items/${index}`, {
+        method: 'PATCH',
+        accessToken: accessToken!,
+        body: JSON.stringify({ completed }),
+      }),
+    onSuccess: (plan) => {
+      queryClient.setQueryData(['weekly-plan'], plan);
+      void queryClient.invalidateQueries({ queryKey: ['home'] });
+    },
   });
 }
 

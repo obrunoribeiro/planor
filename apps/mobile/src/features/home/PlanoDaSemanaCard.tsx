@@ -1,44 +1,46 @@
 // "Plano da semana" — CONTEXTO.md §6.4. Node 25:223 no Figma.
-import { useState } from 'react';
+//
+// A caixa de seleção grava de verdade (`PATCH /weekly-plan/items/:index`); itens que o app
+// conclui sozinho pelos dados já chegam marcados. Tocar no título abre a tela do plano.
 import { Badge, Checkbox, colors, space, radius, typography } from '@planor/ui';
+import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useToggleWeeklyPlanItemMutation } from '@/lib/api/queries';
 import type { WeeklyPlanItem } from '@/lib/api/types';
+import { useMaskedMoneyText } from '@/lib/useMaskedMoneyText';
 
 export type PlanoDaSemanaCardProps = {
   items: WeeklyPlanItem[];
 };
 
 export function PlanoDaSemanaCard({ items }: PlanoDaSemanaCardProps) {
-  // Sem rota pra persistir o toggle ainda (§8 não lista um PATCH pros itens do plano) — o estado
-  // local só reflete o que já veio marcado automaticamente pelos dados (CONTEXTO.md §6.4: "o app
-  // marca o item como feito sozinho, pelos dados").
-  const [doneIndexes, setDoneIndexes] = useState<number[]>(
-    items.flatMap((item, index) => (item.completed ? [index] : [])),
-  );
-
-  const toggle = (index: number) => {
-    setDoneIndexes((prev) => (prev.includes(index) ? prev.filter((x) => x !== index) : [...prev, index]));
-  };
+  const { mutate: toggleItem } = useToggleWeeklyPlanItemMutation();
+  const mask = useMaskedMoneyText();
+  const doneCount = items.filter((item) => item.completed).length;
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <Pressable style={styles.header} onPress={() => router.push('/plano-semana')} accessibilityRole="button">
         <Text style={styles.title}>Plano da semana</Text>
-        <Badge tone="success" label={`${doneIndexes.length} de ${items.length} feitas`} />
-      </View>
+        {items.length > 0 && <Badge tone="success" label={`${doneCount} de ${items.length} feitas`} />}
+      </Pressable>
 
-      {items.map((item, index) => {
-        const done = doneIndexes.includes(index);
-        return (
-          <Pressable key={item.title} style={styles.item} onPress={() => toggle(index)}>
-            <Checkbox checked={done} onPress={() => toggle(index)} accessibilityLabel={item.title} />
-            <View style={styles.itemText}>
-              <Text style={[styles.itemTitle, done ? styles.itemTitleDone : null]}>{item.title}</Text>
-              <Text style={styles.itemDescription}>{item.description}</Text>
-            </View>
-          </Pressable>
-        );
-      })}
+      {items.length === 0 && <Text style={styles.itemDescription}>Nada pendente nesta semana. Toda segunda tem um plano novo.</Text>}
+
+      {items.map((item, index) => (
+        // A lista é fixa na semana (até 3 itens, sempre na mesma ordem): o índice é a identidade.
+        <Pressable key={index} style={styles.item} onPress={() => router.push('/plano-semana')}>
+          <Checkbox
+            checked={item.completed}
+            onPress={() => toggleItem({ index, completed: !item.completed })}
+            accessibilityLabel={item.title}
+          />
+          <View style={styles.itemText}>
+            <Text style={[styles.itemTitle, item.completed ? styles.itemTitleDone : null]}>{mask(item.title)}</Text>
+            <Text style={styles.itemDescription}>{mask(item.description)}</Text>
+          </View>
+        </Pressable>
+      ))}
     </View>
   );
 }

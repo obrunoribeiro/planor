@@ -20,7 +20,7 @@
 | 0 — Base | 🟡 quase completa (falta Sentry/PostHog) |
 | 1 — Interface com dados fictícios | ✅ completa |
 | 2 — Conta e dados reais | 🟡 em andamento (falta PDF, Contas e cartões, jobs agendados; Apple adiado) |
-| 3 — Inteligência | 🟡 em andamento (parcelas, assinaturas, comprometido e sobra prontos) |
+| 3 — Inteligência | 🟡 em andamento (parcelas, assinaturas, comprometido, sobra e plano da semana prontos) |
 | 4 — Monetização | ⬜ não iniciada |
 | 5 — Juntos e crescimento | ⬜ não iniciada |
 
@@ -321,6 +321,19 @@ protótipo do Figma.
   saiu da rota da Home pra `apps/api/src/services/dueThisMonth.ts`, usada pelas duas.
   "Ajustar minha renda" abre a sheet de Editar perfil. Ícones `entrada` e `editar` adicionados ao
   `packages/ui` (paths reais do Figma).
+- **Plano da semana real (§6.4, Figma 47:1163)** — `buildWeeklyPlan`/`evaluateWeeklyPlan` em
+  `packages/shared/src/calculations/weeklyPlan.ts` (com teste). Tipos de item combinados com o
+  Bruno em 2026-10-10: informar a renda (conclui sozinho), separar o valor da fatura que vence na
+  semana (o usuário marca), segurar uma categoria variável acima do ritmo dos últimos 3 meses
+  (limite da semana + quanto já foi; o usuário marca) e categorizar as 10 maiores compras do mês
+  sem categoria (conclui sozinho). No máximo 3, nessa ordem. `apps/api/src/services/weeklyPlan.ts`
+  gera o plano da semana quando ainda não existe (ou é de formato antigo, como o do seed — que
+  foi substituído no lugar), avalia ao vivo e grava. Rotas novas `GET /weekly-plan` e
+  `PATCH /weekly-plan/items/:index` (a marcação à mão antes se perdia). Job `weekly-plan`
+  agendado pra segunda, 6h. Tela nova `apps/mobile/app/plano-semana.tsx`, aberta pelo card da
+  Home; o card agora grava a caixa de seleção. Valores dentro de textos (título "Separar R$ …")
+  obedecem ao olho (`useMaskedMoneyText`). Token `cardDestaque` extraído do Figma pro
+  `packages/ui`. Na conta do Bruno, semana de 5 a 11/10: "Categorizar 8 compras sem categoria".
 - **Rótulos das barras do "Já comprometido" na Home** mostravam reais ÷ 10 ("234" pra R$ 2.340);
   agora reais inteiros, como no Figma (25:197). Também corrigidas chaves React repetidas no card
   de parcelas/assinaturas da Home ("3/3" aparecia duas vezes).
@@ -337,9 +350,9 @@ protótipo do Figma.
 
 **Falta:**
 - Assinaturas: "cobrança duplicada" (§6.3, passo 5) ainda não é detectada — entra junto com os
-  alertas. O plano da semana da Home ainda é do seed e cita assinaturas fictícias ("Streaming de
-  vídeo e App de idiomas").
-- Passos 6–8 (fixo/variável pela recorrência, fora do padrão, uso de assinaturas), plano da semana, telas de Parcelas,
+  alertas. Plano da semana: falta o item "Marcar assinaturas sem uso" (precisa da tela de
+  Assinaturas) e os que dependem de metas e dos objetivos do onboarding.
+- Passos 6–8 (fixo/variável pela recorrência, fora do padrão, uso de assinaturas), telas de Parcelas,
   Assinaturas e Fixos (§6.6; `/future/installments` etc. ainda são stubs), alertas e push, IA.
 - "Atualizar agora" leva ~1 min na conta do Bruno (1.135 transações): a sincronização grava uma
   transação por vez. Dá pra fazer em lote.
@@ -360,6 +373,11 @@ protótipo do Figma.
   compras do fim do mês anterior e deste mês, e sem a transação não dá pra saber a data. Quando o
   banco manda as compras, elas saem dessa linha e entram nas categorias com a data certa. O
   gráfico diário (sparkline) e a divisão fixo/variável da Home não incluem essa parte.
+- **Plano da semana sem o selo "Até R$ X/mês" e sem "a partir dos objetivos que você escolheu"**
+  (Figma 47:1163) — nenhum dos tipos de item de hoje tem economia mensal pra mostrar, e os
+  objetivos do onboarding ainda não são coletados. "Segurar [categoria]" vai até domingo (fim da
+  semana do plano), não "até sexta" como no exemplo do Figma, e é o usuário que marca: só dá pra
+  saber se ficou dentro do limite quando a semana acaba, e aí já é outro plano.
 - **Comprometido não inclui o mês corrente** — começa no mês seguinte (o mês corrente é "a vencer",
   outro número do §2). Recorrência mensal (até 35 dias) cobra uma vez por mês a partir do mês da
   próxima cobrança — somar o intervalo em dias faria um mês "pular" de vez em quando;

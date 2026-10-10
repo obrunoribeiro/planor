@@ -7,11 +7,11 @@
 //   start = (0.5 − dx/2, 0.5 − dy/2)   end = (0.5 + dx/2, 0.5 + dy/2)
 //
 // ⚠️ CONFIRMADOS AO VIVO (via get_design_context, CSS real extraído do Figma):
-//   botao, marcaProfundo, icone, progresso — estilos nomeados `Gradiente/*` do Figma.
+//   botao, marcaProfundo, icone, progresso, cardDestaque — estilos nomeados `Gradiente/*` do Figma.
 //   headerSobra, retrospectiva, jaComprometido, bannerPro, totalGastos, chipAtivo, planoCard —
 //   preenchimentos ad-hoc (não são um estilo `Gradiente/*` nomeado; cada um foi capturado direto
 //   no node que usa).
-// ⚠️ AINDA NÃO EXTRAÍDOS: cardDestaque, sucesso, amber, teal, rosa, azul, progressoAmbar,
+// ⚠️ AINDA NÃO EXTRAÍDOS: sucesso, amber, teal, rosa, azul, progressoAmbar,
 // progressoTeal (estilos `Gradiente/*` nomeados que nenhuma tela que já abrimos usa ainda) — pra
 // completar, rode get_design_context num componente que use cada um.
 
@@ -25,6 +25,14 @@ export type GradientToken = {
 };
 
 export const gradients = {
+  // "Card destaque" — card de progresso do Plano da semana (Figma 47:1177). rgba(124,92,255,0.3) →
+  // rgba(37,23,108,0.5), 155,76°.
+  cardDestaque: {
+    colors: ['rgba(124, 92, 255, 0.3)', 'rgba(37, 23, 108, 0.5)'],
+    angle: 155.76,
+    start: { x: 0.295, y: 0.044 },
+    end: { x: 0.705, y: 0.956 },
+  },
   // Botão primário. #7457F5 → #4F34BE, 135°.
   botao: {
     colors: ['#7457F5', '#4F34BE'],

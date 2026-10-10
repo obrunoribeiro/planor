@@ -2,13 +2,25 @@
 // `apps/api/src/routes/transactions.ts` devolvem.
 import type { Plan } from '@planor/shared';
 
+/** Mesmo formato de `WeeklyPlanItem` em `packages/shared/src/calculations/weeklyPlan.ts`. */
 export type WeeklyPlanItem = {
-  type: string;
+  type: 'income' | 'card_bill' | 'category_limit' | 'categorize';
   title: string;
   description: string;
+  actionLabel: string;
   actionRoute: string;
   completed: boolean;
+  /** "YYYY-MM-DD". */
+  completedAt: string | null;
   completedAutomatically: boolean;
+};
+
+export type WeeklyPlanResponse = {
+  weekStartKey: string;
+  weekEndKey: string;
+  /** "5 a 11 de outubro". */
+  label: string;
+  items: WeeklyPlanItem[];
 };
 
 export type HomeResponse = {
@@ -24,7 +36,7 @@ export type HomeResponse = {
     projectedLeftoverCents: number;
   };
   committed: { nextMonthLabel: string; nextMonthAmountCents: number; months: { label: string; amountCents: number }[] } | null;
-  weeklyPlan: { doneCount: number; totalCount: number; items: WeeklyPlanItem[] };
+  weeklyPlan: { label: string; doneCount: number; totalCount: number; items: WeeklyPlanItem[] };
   spendingThisMonth: { amountCents: number; trendVsLastMonthPct: number | null; sparkline: number[] };
   subscriptions: {
     count: number;

@@ -7,6 +7,7 @@ export * from './calculations/householdSettlement';
 export * from './calculations/creditCardBill';
 export * from './calculations/committedByMonth';
 export * from './calculations/dueUntilMonthEnd';
+export * from './calculations/weeklyPlan';
 export * from './pipeline/normalize';
 export * from './pipeline/categorize';
 export * from './pipeline/monthlySummary';

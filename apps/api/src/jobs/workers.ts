@@ -5,6 +5,7 @@ import { isItemGone } from '../lib/pluggy';
 import { PluggyOwnershipError, syncItem } from '../lib/pluggySync';
 import { checkConsentExpiry, markItemGone, syncAllConnections } from '../services/connectionJobs';
 import { processUserTransactions } from '../services/processTransactions';
+import { generateWeeklyPlans } from '../services/weeklyPlan';
 import { getBoss, QUEUES, type ProcessTransactionsJob, type SyncConnectionJob } from './queue';
 
 export async function startWorkers(log: FastifyBaseLogger) {
@@ -41,6 +42,11 @@ export async function startWorkers(log: FastifyBaseLogger) {
   await boss.work(QUEUES.consentExpiryCheck, async ([job]) => {
     const result = await checkConsentExpiry();
     log.info({ jobId: job?.id, ...result }, 'consent-expiry-check concluído');
+  });
+
+  await boss.work(QUEUES.weeklyPlan, async ([job]) => {
+    const result = await generateWeeklyPlans();
+    log.info({ jobId: job?.id, ...result }, 'weekly-plan concluído');
   });
 
   await boss.work<ProcessTransactionsJob>(QUEUES.processTransactions, async ([job]) => {
