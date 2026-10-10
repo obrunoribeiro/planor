@@ -63,7 +63,8 @@ function AssinaturasCard({ subscriptions }: { subscriptions: HomeResponse['subsc
           <View style={styles.subscriptionsTop}>
             <View style={styles.avatarStack}>
               {subscriptions.avatars.map((avatar, index) => (
-                <View key={avatar.initials} style={[styles.avatarStackItem, index > 0 ? styles.avatarStackOverlap : null]}>
+                // Lista fixa de no máximo 2, e as iniciais podem repetir (duas assinaturas com "S").
+                <View key={index} style={[styles.avatarStackItem, index > 0 ? styles.avatarStackOverlap : null]}>
                   <Avatar
                     initials={avatar.initials}
                     size={30}
@@ -112,8 +113,9 @@ function ParcelamentosCard({ installments }: { installments: HomeResponse['insta
       {() => (
         <>
           <View style={styles.installmentRows}>
-            {installments.progress.map((row) => (
-              <View key={row.label} style={styles.installmentRow}>
+            {/* O rótulo ("3/3") repete entre parcelamentos; a lista é fixa (até 3), então o índice serve. */}
+            {installments.progress.map((row, index) => (
+              <View key={index} style={styles.installmentRow}>
                 <Text style={styles.installmentLabel}>{row.label}</Text>
                 <View style={styles.installmentTrack}>
                   <InstallmentRowFill percent={row.percent} />

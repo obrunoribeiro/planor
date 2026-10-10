@@ -158,4 +158,14 @@ describe('projectCommittedByMonth', () => {
       ['2027-01', 3990, 65_000],
     ]);
   });
+
+  it('mensal com intervalo de 32 dias não pula mês (caso real: Melimais)', () => {
+    const months = projectCommittedByMonth({
+      referenceMonth: '2026-10',
+      horizon: 6,
+      installments: [],
+      recurrences: [{ kind: 'subscription', amountCents: 1990, cadenceDays: 32, nextChargeAt: new Date('2026-09-27T12:00:00Z') }],
+    });
+    expect(months.map((m) => m.subscriptionsCents)).toEqual([1990, 1990, 1990, 1990, 1990, 1990]);
+  });
 });

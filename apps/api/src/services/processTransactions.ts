@@ -3,20 +3,22 @@
 // mesmas transações não muda nada.
 //
 // Cobre: passo 1 (nome do estabelecimento + pagamento de fatura como transferência), passo 2
-// (categorização por regras do usuário e globais), passo 4 (parcelas) e passo 9
-// (`monthly_summaries` e `committed_by_month`). Ficam pra depois: recorrências (5), fora do padrão
-// (7) e plano da semana (9) — ver PROGRESSO.md.
+// (categorização por regras do usuário e globais), passo 4 (parcelas), passo 5 (assinaturas e
+// fixos recorrentes) e passo 9 (`monthly_summaries` e `committed_by_month`). Ficam pra depois:
+// fixo/variável pela recorrência (6), fora do padrão (7) e plano da semana (9) — ver PROGRESSO.md.
 import { and, eq, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import { accounts, categories, categoryRules, committedByMonth, installmentPlans, monthlySummaries, recurrences, transactions } from '@planor/db';
 import {
   buildMonthlySummaries,
   categorizeTransaction,
   detectInstallmentPlans,
+  detectRecurrences,
   isCardBillPayment,
   monthKeySaoPaulo,
   normalizeForMatch,
   normalizeMerchantName,
   projectCommittedByMonth,
+  recurrenceMerchantKey,
   type DetectedInstallmentPlan,
   type ExpenseKind,
 } from '@planor/shared';
@@ -269,6 +271,95 @@ async function syncInstallmentPlans(userId: string, referenceMonth: string): Pro
   return detected;
 }
 
+/** Passo 5 — assinaturas e fixos recorrentes. Como nos parcelamentos: atualiza no lugar o que já
+ * existia (mantém o id e o que o usuário respondeu, como "Não uso"), cria os novos e apaga os que
+ * não aparecem mais. Exceção: o que o usuário marcou como "Já cancelei" fica, mesmo sem cobrança
+ * (§6.6: "confirma se a cobrança voltar"). */
+async function syncRecurrences(userId: string, now: Date): Promise<{ recurrences: number }> {
+  const rows = await db
+    .select({
+      id: transactions.id,
+      descriptionRaw: transactions.descriptionRaw,
+      merchantName: transactions.merchantName,
+      postedAt: transactions.postedAt,
+      amountCents: transactions.amountCents,
+      categoryName: categories.name,
+    })
+    .from(transactions)
+    .leftJoin(categories, eq(categories.id, transactions.categoryId))
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        eq(transactions.isHidden, false),
+        eq(transactions.isTransfer, false),
+        // Parcela se repete todo mês com o mesmo valor, mas é parcelamento (passo 4), não assinatura.
+        isNull(transactions.installmentPlanId),
+        isNull(transactions.installmentCount),
+      ),
+    );
+
+  const detected = detectRecurrences(rows, now);
+
+  await db.transaction(async (tx) => {
+    const existing = await tx.select().from(recurrences).where(eq(recurrences.userId, userId));
+    const unmatched = new Set(existing.map((r) => r.id));
+    const links: { transactionId: string; recurrenceId: string }[] = [];
+
+    for (const found of detected) {
+      // Mesmo comerciante e valor na faixa da série (até −10% / +50%, a mesma do reajuste).
+      const match = existing.find(
+        (r) =>
+          unmatched.has(r.id) &&
+          recurrenceMerchantKey(r.merchantName) === found.merchantKey &&
+          found.amountCents >= r.amountCents * 0.9 &&
+          found.amountCents <= r.amountCents * 1.5,
+      );
+      const values = {
+        merchantName: found.merchantName,
+        amountCents: found.amountCents,
+        cadenceDays: found.cadenceDays,
+        nextChargeAt: found.nextChargeAt,
+        priceHistory: found.priceHistory,
+        estimated: found.estimated,
+      };
+      let recurrenceId: string;
+      if (match) {
+        unmatched.delete(match.id);
+        recurrenceId = match.id;
+        // Status: "Já cancelei" continua cancelado; o que tinha terminado volta a ficar ativo.
+        await tx
+          .update(recurrences)
+          .set({ ...values, status: match.status === 'cancelled_by_user' ? match.status : 'active' })
+          .where(eq(recurrences.id, match.id));
+      } else {
+        recurrenceId = (await tx.insert(recurrences).values({ userId, kind: found.kind, ...values }).returning())[0]!.id;
+      }
+      for (const transactionId of found.transactionIds) links.push({ transactionId, recurrenceId });
+    }
+
+    await tx
+      .update(transactions)
+      .set({ recurrenceId: null })
+      .where(and(eq(transactions.userId, userId), isNotNull(transactions.recurrenceId)));
+    for (let i = 0; i < links.length; i += UPDATE_CHUNK) {
+      const values = sql.join(
+        links.slice(i, i + UPDATE_CHUNK).map((l) => sql`(${l.transactionId}::uuid, ${l.recurrenceId}::uuid)`),
+        sql`, `,
+      );
+      await tx.execute(sql`
+        update transactions as t set recurrence_id = v.recurrence_id
+        from (values ${values}) as v(id, recurrence_id)
+        where t.id = v.id
+      `);
+    }
+
+    const staleIds = existing.filter((r) => unmatched.has(r.id) && r.status !== 'cancelled_by_user').map((r) => r.id);
+    if (staleIds.length > 0) await tx.delete(recurrences).where(inArray(recurrences.id, staleIds));
+  });
+
+  return { recurrences: detected.length };
+}
+
 /** Passo 9 — `committed_by_month` dos próximos meses: parcelas detectadas + recorrências ativas. */
 async function recomputeCommittedByMonth(userId: string, referenceMonth: string, plans: DetectedInstallmentPlan[]): Promise<{ months: number }> {
   const activeRecurrences = await db
@@ -292,10 +383,12 @@ async function recomputeCommittedByMonth(userId: string, referenceMonth: string,
 }
 
 export async function processUserTransactions(userId: string) {
-  const referenceMonth = monthKeySaoPaulo(new Date());
+  const now = new Date();
+  const referenceMonth = monthKeySaoPaulo(now);
   const { updated } = await normalizeAndCategorize(userId);
   const { months } = await recomputeMonthlySummaries(userId);
   const plans = await syncInstallmentPlans(userId, referenceMonth);
+  const { recurrences: recurrencesFound } = await syncRecurrences(userId, now);
   const committed = await recomputeCommittedByMonth(userId, referenceMonth, plans);
-  return { updated, months, installmentPlans: plans.length, committedMonths: committed.months };
+  return { updated, months, installmentPlans: plans.length, recurrences: recurrencesFound, committedMonths: committed.months };
 }

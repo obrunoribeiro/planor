@@ -20,7 +20,7 @@
 | 0 — Base | 🟡 quase completa (falta Sentry/PostHog) |
 | 1 — Interface com dados fictícios | ✅ completa |
 | 2 — Conta e dados reais | 🟡 em andamento (falta PDF, Contas e cartões, jobs agendados; Apple adiado) |
-| 3 — Inteligência | 🟡 em andamento (parcelas e comprometido prontos) |
+| 3 — Inteligência | 🟡 em andamento (parcelas, assinaturas e comprometido prontos) |
 | 4 — Monetização | ⬜ não iniciada |
 | 5 — Juntos e crescimento | ⬜ não iniciada |
 
@@ -292,6 +292,18 @@ protótipo do Figma.
   `packages/shared/src/calculations/committedByMonth.ts` (com teste): próximos 6 meses, a partir do
   mês seguinte, com parcelas (valor real de cada parcela quando ela já existe como transação) +
   recorrências ativas. Recalculado no mesmo job; `committed_by_month` não vem mais do seed.
+- **Assinaturas e fixos recorrentes (§6.3, passo 5)** — `detectRecurrences` em
+  `packages/shared/src/pipeline/recurrences.ts` (com teste). Mesmo comerciante, intervalo de 28 a
+  35 dias, valor ±10%, pelo menos 2 cobranças, e cobrança nos últimos 45 dias. Assinatura vs. fixo
+  recorrente pela categoria (Moradia, Contas da casa, Educação e Saúde → fixo; o resto,
+  assinatura). Fixo recorrente vale a média das 3 últimas cobranças (`estimated` quando variam).
+  O job grava em `recurrences` (atualiza no lugar, mantém "Já cancelei") e liga as cobranças
+  (`transactions.recurrence_id`). As 12 recorrências fictícias do seed saíram. Na conta do Bruno:
+  Spotify, Crunchyroll, Claude, Melimais, Adoreshare e Framer (R$ 135,31/mês) + Conta Vivo
+  (R$ 85,80, estimada); comprometido de novembro R$ 419,47, sem nenhum número do seed.
+- **Rótulos das barras do "Já comprometido" na Home** mostravam reais ÷ 10 ("234" pra R$ 2.340);
+  agora reais inteiros, como no Figma (25:197). Também corrigidas chaves React repetidas no card
+  de parcelas/assinaturas da Home ("3/3" aparecia duas vezes).
 - **Futuro: cards de fatura com a fatura real** de cada cartão conectado
   (`credit_cards.current_bill_cents`) e vencimento pelo dia de vencimento do cartão
   (`nextDueDateKey`, com teste).
@@ -304,9 +316,9 @@ protótipo do Figma.
   diferença entre limite usado e fatura do Nubank. Os 5 parcelamentos fictícios do seed saíram.
 
 **Falta:**
-- **Assinaturas e fixos recorrentes (passo 5)** — `recurrences` ainda é do seed (8 assinaturas e
-  4 fixos fictícios), e por isso o comprometido de cada mês ainda soma R$ 187,40 + R$ 1.032,75
-  inventados em cima das parcelas reais.
+- Assinaturas: "cobrança duplicada" (§6.3, passo 5) ainda não é detectada — entra junto com os
+  alertas. O plano da semana da Home ainda é do seed e cita assinaturas fictícias ("Streaming de
+  vídeo e App de idiomas").
 - Passos 6–8 (fixo/variável pela recorrência, fora do padrão, uso de assinaturas), "a vencer" do
   mês na sobra prevista (`dueUntilMonthEnd` ainda é 0), plano da semana, telas de Parcelas,
   Assinaturas e Fixos (§6.6; `/future/installments` etc. ainda são stubs), alertas e push, IA.
@@ -320,8 +332,14 @@ protótipo do Figma.
 - **Só parcelamentos ativos ficam em `installment_plans`** (a última parcela é do mês atual ou
   depois). Os que já terminaram não aparecem em lugar nenhum hoje, e guardar todos inflaria os
   totais da Home, que soma a tabela inteira.
+- **Regra de recorrência mais solta que a do §6.3 em um ponto e mais rígida em outros** (pedido
+  dos dados reais): alta de até 50% entre duas cobranças continua a série (é reajuste — o Spotify
+  subiu 28%); comerciante com mais de 3 cobranças por mês não é assinatura (TikTok, padaria);
+  IOF de compra internacional fica de fora; série sem cobrança há mais de 45 dias é considerada
+  encerrada e sai da lista (a resposta "Uso pouco/Não uso" dela se perde se ela voltar depois).
 - **Comprometido não inclui o mês corrente** — começa no mês seguinte (o mês corrente é "a vencer",
-  outro número do §2). Recorrência mensal sem data de próxima cobrança é projetada em todo mês;
+  outro número do §2). Recorrência mensal (até 35 dias) cobra uma vez por mês a partir do mês da
+  próxima cobrança — somar o intervalo em dias faria um mês "pular" de vez em quando;
   recorrência com intervalo maior que 35 dias e sem data não entra (não dá pra saber o mês).
 - **Futuro não lê `card_statements`** — a sincronização ainda não grava faturas (falta data de
   fechamento confiável). O card usa a fatura aberta calculada e o próximo vencimento pelo dia do
