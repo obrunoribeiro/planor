@@ -334,6 +334,15 @@ protótipo do Figma.
   Home; o card agora grava a caixa de seleção. Valores dentro de textos (título "Separar R$ …")
   obedecem ao olho (`useMaskedMoneyText`). Token `cardDestaque` extraído do Figma pro
   `packages/ui`. Na conta do Bruno, semana de 5 a 11/10: "Categorizar 8 compras sem categoria".
+- **Telas de Parcelas (§6.6, Figma 30:592 e 31:519)** — `apps/mobile/app/futuro/parcelas.tsx`
+  (resumo por mês/falta pagar/último mês + lista com progresso) e
+  `apps/mobile/app/futuro/parcela/[id].tsx` (anel, linha do tempo das parcelas, total, já pago,
+  falta, próxima e última parcela, dica de quitar antecipado). Abertas pela linha "Parcelas" do
+  Futuro. `GET /future/installments` (era stub) com `installmentPlanProgress` em
+  `packages/shared` (com teste): "falta pagar" = parcelas que ainda vêm × valor da parcela, "já
+  pago" = total − falta (o banco arredonda a 1ª parcela, e o outro jeito deixava centavos). Na
+  conta do Bruno: 9 parcelamentos, R$ 652,02/mês, falta R$ 513,20. Gradientes `resumoParcelas` e
+  `dicaIa` capturados do Figma pro `packages/ui`.
 - **Rótulos das barras do "Já comprometido" na Home** mostravam reais ÷ 10 ("234" pra R$ 2.340);
   agora reais inteiros, como no Figma (25:197). Também corrigidas chaves React repetidas no card
   de parcelas/assinaturas da Home ("3/3" aparecia duas vezes).
@@ -352,6 +361,10 @@ protótipo do Figma.
 - Assinaturas: "cobrança duplicada" (§6.3, passo 5) ainda não é detectada — entra junto com os
   alertas. Plano da semana: falta o item "Marcar assinaturas sem uso" (precisa da tela de
   Assinaturas) e os que dependem de metas e dos objetivos do onboarding.
+- Parcelas: "Editar parcelamento" (Figma 49:1137 — nome, categoria, aviso antes da última,
+  "Já quitei antecipado") e o filtro do topo ("Filtrar compromissos", 49:1095). Os valores das
+  linhas do bloco do mês no Futuro ainda usam `formatCents` e não obedecem ao olho.
+- Telas de Assinaturas e Fixos recorrentes (§6.6) — próximos PRs.
 - Passos 6–8 (fixo/variável pela recorrência, fora do padrão, uso de assinaturas), telas de Parcelas,
   Assinaturas e Fixos (§6.6; `/future/installments` etc. ainda são stubs), alertas e push, IA.
 - "Atualizar agora" leva ~1 min na conta do Bruno (1.135 transações): a sincronização grava uma

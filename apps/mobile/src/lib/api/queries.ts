@@ -8,6 +8,7 @@ import type {
   ConnectionListItem,
   FutureTimelineResponse,
   HomeResponse,
+  InstallmentsResponse,
   LeftoverForecastResponse,
   ImportResultResponse,
   MeResponse,
@@ -59,6 +60,15 @@ export function useLeftoverForecastQuery() {
   return useQuery({
     queryKey: ['leftover-forecast'],
     queryFn: () => apiFetch<LeftoverForecastResponse>('/forecast/leftover', { accessToken: accessToken! }),
+    enabled: !!accessToken,
+  });
+}
+
+export function useInstallmentsQuery() {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['installments'],
+    queryFn: () => apiFetch<InstallmentsResponse>('/future/installments', { accessToken: accessToken! }),
     enabled: !!accessToken,
   });
 }

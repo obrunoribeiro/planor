@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { projectCommittedByMonth } from '../calculations/committedByMonth';
-import { addMonthsToKey, detectInstallmentPlans, monthsBetweenKeys, parseInstallmentSuffix, type InstallmentTransaction } from './installments';
+import { addMonthsToKey, detectInstallmentPlans, installmentPlanProgress, monthsBetweenKeys, parseInstallmentSuffix, type InstallmentTransaction } from './installments';
 
 describe('parseInstallmentSuffix', () => {
   it.each([
@@ -167,5 +167,24 @@ describe('projectCommittedByMonth', () => {
       recurrences: [{ kind: 'subscription', amountCents: 1990, cadenceDays: 32, nextChargeAt: new Date('2026-09-27T12:00:00Z') }],
     });
     expect(months.map((m) => m.subscriptionsCents)).toEqual([1990, 1990, 1990, 1990, 1990, 1990]);
+  });
+});
+
+describe('installmentPlanProgress', () => {
+  it('bate com o Figma (Celular 3/10 de R$ 240, Nubank vence dia 10)', () => {
+    expect(installmentPlanProgress({ installmentCents: 24_000, totalCents: 240_000, count: 10, current: 3 }, '2026-10', 10)).toEqual({
+      paidCents: 72_000,
+      remainingCents: 168_000,
+      nextDue: '2026-11-10',
+    });
+  });
+
+  it('na última parcela não tem próxima; sem dia de vencimento, só o mês', () => {
+    expect(installmentPlanProgress({ installmentCents: 16_333, totalCents: 49_000, count: 3, current: 3 }, '2026-10', 18)).toEqual({
+      paidCents: 49_000,
+      remainingCents: 0,
+      nextDue: null,
+    });
+    expect(installmentPlanProgress({ installmentCents: 2912, totalCents: 34_944, count: 12, current: 6 }, '2026-12', null).nextDue).toBe('2027-01');
   });
 });

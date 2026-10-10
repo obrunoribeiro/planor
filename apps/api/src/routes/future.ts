@@ -1,7 +1,7 @@
 // Linha do tempo, parcelas, assinaturas e fixos — CONTEXTO.md §6.6, §8.
 import { and, eq, isNotNull, ne } from 'drizzle-orm';
 import { accounts, committedByMonth, connections, creditCards, installmentPlans, institutions, recurrences } from '@planor/db';
-import { monthAbbrevPtBR, monthNamePtBR, nextDueDateKey } from '@planor/shared';
+import { installmentPlanProgress, monthAbbrevPtBR, monthKeySaoPaulo, monthNamePtBR, nextDueDateKey } from '@planor/shared';
 import type { FastifyInstance } from 'fastify';
 import { requireUserId } from '../lib/auth';
 import { db } from '../lib/db';
@@ -86,7 +86,59 @@ export async function futureRoutes(app: FastifyInstance) {
     };
   });
 
-  app.get('/future/installments', async (_req, reply) => notImplemented(reply, 'Parcelas — Fase 3 (§6.6)'));
+  // Parcelas (§6.6): resumo (por mês, falta pagar, último mês) + cada parcelamento ativo com o
+  // progresso. O detalhe do parcelamento usa esta mesma lista (não tem rota própria).
+  app.get('/future/installments', async (request, reply) => {
+    const userId = await requireUserId(request, reply);
+    if (!userId) return;
+
+    const referenceMonth = monthKeySaoPaulo(new Date());
+    const rows = await db
+      .select({
+        id: installmentPlans.id,
+        merchantName: installmentPlans.merchantName,
+        installmentCents: installmentPlans.installmentCents,
+        totalCents: installmentPlans.totalCents,
+        count: installmentPlans.count,
+        current: installmentPlans.current,
+        firstDate: installmentPlans.firstDate,
+        lastDate: installmentPlans.lastDate,
+        bank: institutions.name,
+        dueDay: creditCards.dueDay,
+      })
+      .from(installmentPlans)
+      .innerJoin(accounts, eq(accounts.id, installmentPlans.accountId))
+      .innerJoin(connections, eq(connections.id, accounts.connectionId))
+      .innerJoin(institutions, eq(institutions.id, connections.institutionId))
+      .leftJoin(creditCards, eq(creditCards.accountId, accounts.id))
+      .where(eq(installmentPlans.userId, userId));
+
+    const plans = rows
+      .map((row) => {
+        const progress = installmentPlanProgress(row, referenceMonth, row.dueDay);
+        return {
+          id: row.id,
+          merchantName: row.merchantName,
+          bank: row.bank,
+          installmentCents: row.installmentCents,
+          totalCents: row.totalCents,
+          count: row.count,
+          current: row.current,
+          firstMonth: row.firstDate.slice(0, 7),
+          lastMonth: row.lastDate.slice(0, 7),
+          ...progress,
+        };
+      })
+      // Como no Figma (30:592): quem termina por último primeiro.
+      .sort((a, b) => b.lastMonth.localeCompare(a.lastMonth) || b.installmentCents - a.installmentCents);
+
+    return {
+      monthlyCents: plans.reduce((sum, p) => sum + p.installmentCents, 0),
+      remainingCents: plans.reduce((sum, p) => sum + p.remainingCents, 0),
+      lastMonth: plans.reduce<string | null>((latest, p) => (!latest || p.lastMonth > latest ? p.lastMonth : latest), null),
+      plans,
+    };
+  });
   app.get('/future/subscriptions', async (_req, reply) => notImplemented(reply, 'Assinaturas — Fase 3 (§6.6)'));
   app.get('/future/bills', async (_req, reply) => notImplemented(reply, 'Fixos recorrentes — Fase 3 (§6.6)'));
   app.get('/future/statements/:id', async (_req, reply) => notImplemented(reply, 'Fatura do cartão — Fase 3 (§6.6)'));

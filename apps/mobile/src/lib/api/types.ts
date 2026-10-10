@@ -86,6 +86,31 @@ export type LeftoverForecastResponse = {
   projectedLeftoverCents: number;
 };
 
+export type InstallmentPlanItem = {
+  id: string;
+  merchantName: string;
+  bank: string;
+  installmentCents: number;
+  totalCents: number;
+  count: number;
+  /** Parcela deste mês (1 a `count`). */
+  current: number;
+  /** "YYYY-MM". */
+  firstMonth: string;
+  lastMonth: string;
+  paidCents: number;
+  remainingCents: number;
+  /** "YYYY-MM-DD", ou "YYYY-MM" sem dia de vencimento; nulo na última parcela. */
+  nextDue: string | null;
+};
+
+export type InstallmentsResponse = {
+  monthlyCents: number;
+  remainingCents: number;
+  lastMonth: string | null;
+  plans: InstallmentPlanItem[];
+};
+
 export type FutureTimelineResponse = {
   committed: { untilLabel: string | null; totalCents: number; months: { label: string; amountCents: number; active: boolean }[] };
   currentMonth: {

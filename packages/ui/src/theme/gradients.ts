@@ -25,6 +25,22 @@ export type GradientToken = {
 };
 
 export const gradients = {
+  // Resumo de Parcelas (Figma 30:606). #2B1A86 → #1A1440 (55%) → #16151A, 160,37° — mesmas cores
+  // do `totalGastos`, outro ângulo.
+  resumoParcelas: {
+    colors: ['#2B1A86', '#1A1440', '#16151A'],
+    locations: [0, 0.55, 1],
+    angle: 160.37,
+    start: { x: 0.332, y: 0.029 },
+    end: { x: 0.668, y: 0.971 },
+  },
+  // "Dica da IA" (Figma 31:572). rgba(124,92,255,0.18) → rgba(37,23,108,0.3), 166,2°.
+  dicaIa: {
+    colors: ['rgba(124, 92, 255, 0.18)', 'rgba(37, 23, 108, 0.3)'],
+    angle: 166.2,
+    start: { x: 0.381, y: 0.014 },
+    end: { x: 0.619, y: 0.986 },
+  },
   // "Card destaque" — card de progresso do Plano da semana (Figma 47:1177). rgba(124,92,255,0.3) →
   // rgba(37,23,108,0.5), 155,76°.
   cardDestaque: {
