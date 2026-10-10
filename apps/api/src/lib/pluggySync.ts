@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { accounts, connections, creditCards, institutions, transactions } from '@planor/db';
 import type { connectionStatusEnum } from '@planor/db';
 import { enqueueProcessTransactions } from '../jobs/queue';
+import { alertOnStatusChange } from '../services/connectionJobs';
 import { db } from './db';
 import { getItem, listAccounts, listTransactions, type PluggyAccount, type PluggyItem } from './pluggy';
 
@@ -81,6 +82,15 @@ export async function syncItem(userId: string, itemId: string): Promise<{ connec
   const connection = existingConnection
     ? (await db.update(connections).set(connectionValues).where(eq(connections.id, existingConnection.id)).returning())[0]!
     : (await db.insert(connections).values(connectionValues).returning())[0]!;
+
+  await alertOnStatusChange({
+    userId,
+    connectionId: connection.id,
+    institutionName: institution.name,
+    previous: existingConnection?.status ?? null,
+    next: connection.status,
+    errorCode: connection.errorCode,
+  });
 
   const pluggyAccounts = await listAccounts(item.id);
   let transactionsImported = 0;

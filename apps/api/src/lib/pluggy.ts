@@ -35,13 +35,24 @@ async function getApiKey(): Promise<string> {
   return apiKey;
 }
 
+/** Erro HTTP do Pluggy com o status, pra quem chama distinguir "item não existe" (404 — não
+ * adianta tentar de novo) de falha passageira. */
+export class PluggyHttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
 async function pluggyFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const apiKey = await getApiKey();
   const response = await fetch(`${BASE_URL}${path}`, {
     ...init,
     headers: { ...init?.headers, 'X-API-KEY': apiKey, 'Content-Type': 'application/json' },
   });
-  if (!response.ok) throw new Error(`Pluggy ${path} falhou (${response.status}): ${await response.text()}`);
+  if (!response.ok) throw new PluggyHttpError(response.status, `Pluggy ${path} falhou (${response.status}): ${await response.text()}`);
   return response.json() as Promise<T>;
 }
 
@@ -70,6 +81,35 @@ export async function createConnectToken(opts: { itemId?: string; clientUserId: 
 
 export async function getItem(itemId: string): Promise<PluggyItem> {
   return pluggyFetch<PluggyItem>(`/items/${itemId}`);
+}
+
+/** Item não existe (mais) no Pluggy: 404, ou 400 "not an uuid" (id inventado, ex.: seed). Não
+ * adianta tentar de novo. */
+export function isItemGone(err: unknown): boolean {
+  return err instanceof PluggyHttpError && (err.status === 404 || (err.status === 400 && err.message.includes('not an uuid')));
+}
+
+/**
+ * Pede pro Pluggy buscar dados novos no banco (`PATCH /items/{id}` com corpo vazio reaproveita
+ * as credenciais guardadas). É assíncrono do lado deles: o item fica `UPDATING` e o dado novo só
+ * aparece depois — por isso quem chama agenda a leitura (`sync-connection`) pra alguns minutos
+ * depois, além do webhook `item/updated`.
+ *
+ * `not_supported`: item do plano "Meu Pluggy" — confirmado em 2026-10-08 contra a conexão real
+ * do Bruno, o Pluggy responde 400 "MeuPluggy item cant be updated". Nesse plano quem atualiza
+ * com o banco é o próprio app meu.pluggy.ai, sozinho; a gente só consegue reler o que ele já
+ * trouxe. Outros erros (MFA, banco fora do ar) sobem pra quem chamou.
+ */
+export async function requestItemRefresh(itemId: string): Promise<'requested' | 'not_supported'> {
+  try {
+    await pluggyFetch(`/items/${itemId}`, { method: 'PATCH', body: JSON.stringify({}) });
+    return 'requested';
+  } catch (err) {
+    if (err instanceof PluggyHttpError && err.status === 400 && err.message.includes('MeuPluggy item cant be updated')) {
+      return 'not_supported';
+    }
+    throw err;
+  }
 }
 
 export async function deleteItem(itemId: string): Promise<void> {
