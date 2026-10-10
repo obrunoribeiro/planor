@@ -8,6 +8,10 @@
     "scheme": "planor",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0B0A12",
+    "ios": {
+      "bundleIdentifier": "com.planor.app",
+      "supportsTablet": false
+    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0B0A12",
@@ -31,7 +35,8 @@
           "imageWidth": 120
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "./plugins/withIosSceneLifecycle"
     ],
     "experiments": {
       "typedRoutes": true,

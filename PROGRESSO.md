@@ -19,7 +19,7 @@
 |---|---|
 | 0 — Base | 🟡 quase completa (falta Sentry/PostHog) |
 | 1 — Interface com dados fictícios | ✅ completa |
-| 2 — Conta e dados reais | 🟡 em andamento (falta Apple, PDF, Contas e cartões, jobs agendados) |
+| 2 — Conta e dados reais | 🟡 em andamento (falta PDF, Contas e cartões, jobs agendados; Apple adiado) |
 | 3 — Inteligência | ⬜ não iniciada |
 | 4 — Monetização | ⬜ não iniciada |
 | 5 — Juntos e crescimento | ⬜ não iniciada |
@@ -72,11 +72,23 @@ protótipo do Figma.
   Botão real em "Criar conta". **Testado no celular e confirmado que o Expo Go não serve pra esse
   fluxo** — a sessão sempre cancela com `ASWebAuthenticationSessionErrorCode.canceledLogin` depois
   de escolher a conta no Google (limitação documentada do próprio Expo: custom URL schemes de
-  OAuth não funcionam de forma confiável no Expo Go). Precisa de um **build de desenvolvimento**
-  (`expo-dev-client`, já instalado como dependência) pra validar de verdade — em andamento,
-  bloqueado por instalar o Xcode completo (só as Command Line Tools estavam presentes).
-  `AuthProvider.tsx` tem logs de diagnóstico temporários (`console.log('[google-auth]...`) que
-  devem sair assim que o fluxo for validado pelo build de desenvolvimento.
+  OAuth não funcionam de forma confiável no Expo Go). **Validado em 2026-10-10 no build de
+  desenvolvimento iOS** (`expo-dev-client`, simulador iPhone 17): escolhe a conta no Google e cai
+  logado na Home. Os logs de diagnóstico temporários (`[google-auth]`) já saíram do
+  `AuthProvider.tsx`.
+- **Build de desenvolvimento iOS funcionando** (`pnpm --filter mobile ios` = `expo run:ios`, que
+  roda o prebuild, compila no Xcode e sobe o Metro). Bundle ID `com.planor.app`, só iPhone
+  (`supportsTablet: false`). A pasta `apps/mobile/ios/` é gerada e fica fora do git. Duas
+  pegadinhas que travaram a primeira compilação:
+  - **O repositório não pode ficar numa pasta sincronizada pelo iCloud** (`~/Desktop`,
+    `~/Documents` com "Mesa e Documentos" ligado). O iCloud põe atributos estendidos nos arquivos e
+    o `codesign` falha com "resource fork, Finder information, or similar detritus not allowed".
+    Clonar em `~/Developer/` ou outra pasta fora do iCloud.
+  - **Xcode 27 exige o ciclo de vida por cenas (UIScene)**, que o template do Expo SDK 57 ainda
+    não usa. Sem isso o app fecha ao abrir. O config plugin `apps/mobile/plugins/withIosSceneLifecycle.js`
+    resolve; apagar o plugin quando subir pro Expo SDK 58.
+  - Pra instalar no iPhone físico, falta escolher um Team de assinatura no Xcode (Apple ID grátis
+    funciona, mas o app expira em 7 dias). Até agora só foi testado no simulador.
 - **Transações (lista) e Detalhe da transação construídas com dado real** — essas telas nunca
   tinham sido feitas, nem com mock, apesar do `PROGRESSO.md` antigo marcar a Fase 1 como completa
   (havia um TODO no código confirmando isso: `gastos.tsx`, "próxima da Fase 1"). Novo:
@@ -227,7 +239,10 @@ protótipo do Figma.
   `ScreenGlow` foi pra `src/components` (agora usado por Gastos e Contas).
 
 **Falta:**
-- Login com Apple — precisa do Apple Developer Program (US$99/ano), que ainda não existe.
+- Build de desenvolvimento no iPhone físico (precisa de Team de assinatura no Xcode) e no
+  Android (`expo run:android` nunca foi rodado). O login com Google só foi testado no simulador iOS.
+- Login com Apple — **adiado por decisão do Bruno (2026-10-10)**. Precisa do Apple Developer
+  Program (US$99/ano), que ainda não existe. Só volta quando a conta for assinada.
 - Segurança: biometria, bloqueio automático ao sair do app, trocar e-mail e aparelhos conectados
   — só "Ocultar valores ao abrir" é real por enquanto (ver acima).
 - Pluggy: validado ponta a ponta, e as telas de Contas e cartões existem (ver "Feito"). O que
