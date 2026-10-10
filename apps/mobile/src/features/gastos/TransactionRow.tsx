@@ -8,9 +8,13 @@ import type { TransactionListItem } from '@/lib/api/types';
 export type TransactionRowProps = {
   transaction: TransactionListItem;
   onPress: () => void;
+  /** Troca a linha de baixo (padrão: categoria). Ex.: data e hora, na tela da categoria. */
+  subtitle?: string;
+  /** Texto pequeno embaixo do valor (ex.: a conta, na tela da categoria — Figma 28:461). */
+  amountCaption?: string | null;
 };
 
-export function TransactionRow({ transaction, onPress }: TransactionRowProps) {
+export function TransactionRow({ transaction, onPress, subtitle, amountCaption }: TransactionRowProps) {
   const isIncome = transaction.amountCents >= 0;
   const title = transaction.merchantName ?? transaction.descriptionRaw;
 
@@ -24,12 +28,19 @@ export function TransactionRow({ transaction, onPress }: TransactionRowProps) {
           {title}
         </Text>
         <Text style={styles.subtitle} numberOfLines={1}>
-          {transaction.categoryName ?? 'Sem categoria'}
+          {subtitle ?? transaction.categoryName ?? 'Sem categoria'}
           {transaction.isInstallment ? ' · Parcela' : ''}
           {transaction.isHidden ? ' · Oculta' : ''}
         </Text>
       </View>
-      <Text style={[styles.amount, isIncome ? styles.amountIncome : null]}>{formatCentsWithSign(transaction.amountCents)}</Text>
+      <View style={styles.amountBox}>
+        <Text style={[styles.amount, isIncome ? styles.amountIncome : null]}>{formatCentsWithSign(transaction.amountCents)}</Text>
+        {amountCaption ? (
+          <Text style={styles.subtitle} numberOfLines={1}>
+            {amountCaption}
+          </Text>
+        ) : null}
+      </View>
     </Pressable>
   );
 }
@@ -64,6 +75,11 @@ const styles = StyleSheet.create({
     fontSize: typography.caption.fontSize,
     letterSpacing: typography.caption.letterSpacing,
     color: colors.dark.text.tertiary,
+  },
+  amountBox: {
+    alignItems: 'flex-end',
+    gap: space[2],
+    maxWidth: '40%',
   },
   amount: {
     fontFamily: typography.labelMedium.fontFamily,

@@ -9,7 +9,8 @@ import { colors, Dialog, EmptyState, Icon, ScreenHeader, SecondaryButton, Skelet
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { BankAvatar, connectionUiState, InfoRows, ScreenGlow } from '@/features/contas/shared';
+import { ScreenGlow } from '@/components/ScreenGlow';
+import { BankAvatar, connectionUiState, InfoRows } from '@/features/contas/shared';
 import { useConnectionsQuery, useDisconnectConnectionMutation, useRefreshConnectionMutation } from '@/lib/api/queries';
 import { longDateFromIso, relativeTimeLabel } from '@/lib/format';
 

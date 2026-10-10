@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { categorizeTransaction, isCardBillPayment } from './categorize';
-import { buildMonthlySummaries, monthKeySaoPaulo, previousMonthKey, trendVsPreviousPct } from './monthlySummary';
+import { buildMonthlySummaries, lastMonthKeys, monthKeySaoPaulo, monthlyAverageCents, previousMonthKey, trendVsPreviousPct } from './monthlySummary';
 import { normalizeForMatch, normalizeMerchantName } from './normalize';
 
 describe('normalizeMerchantName', () => {
@@ -193,5 +193,34 @@ describe('helpers de mês', () => {
     expect(trendVsPreviousPct(1000, 0)).toBeNull();
     expect(trendVsPreviousPct(1100, 1000)).toBe(10);
     expect(trendVsPreviousPct(900, 1000)).toBe(-10);
+  });
+});
+
+describe('lastMonthKeys', () => {
+  it('devolve os N meses até o mês pedido, virando o ano', () => {
+    expect(lastMonthKeys('2026-02', 4)).toEqual(['2025-11', '2025-12', '2026-01', '2026-02']);
+    expect(lastMonthKeys('2026-10', 1)).toEqual(['2026-10']);
+  });
+});
+
+describe('monthlyAverageCents', () => {
+  it('ignora meses sem dado (antes de conectar o banco), mas conta zero de mês com dado', () => {
+    expect(
+      monthlyAverageCents([
+        { amountCents: 0, hasData: false },
+        { amountCents: 0, hasData: false },
+        { amountCents: 30_000, hasData: true },
+        { amountCents: 0, hasData: true },
+        { amountCents: 60_000, hasData: true },
+      ]),
+    ).toBe(30_000);
+  });
+
+  it('sem nenhum mês com dado não inventa média', () => {
+    expect(monthlyAverageCents([{ amountCents: 0, hasData: false }])).toBeNull();
+  });
+
+  it('arredonda pro centavo', () => {
+    expect(monthlyAverageCents([{ amountCents: 100, hasData: true }, { amountCents: 101, hasData: true }])).toBe(101);
   });
 });

@@ -216,6 +216,16 @@ protótipo do Figma.
   - `apiFetch` (mobile) não manda mais `Content-Type: application/json` sem corpo (o Fastify
     recusava o DELETE com 400) e aceita resposta 204.
 
+- **Detalhe da categoria** (CONTEXTO.md §6.5, Figma 28:396) — `GET /spending/category/:id?month=`
+  (era stub 501) e tela `app/gastos/categoria/[id].tsx`, aberta tocando numa categoria do resumo
+  de Gastos. Total do mês e barras dos 6 meses vêm de `monthly_summaries` (batem com o resumo);
+  contagem, ticket médio e lista vêm das transações com os mesmos filtros do pipeline. "Outros"
+  inclui as sem categoria. Média dos 6 meses só conta meses em que já havia dado
+  (`monthlyAverageCents` em `packages/shared`, com teste). Validado via HTTP com dado real: o
+  total de cada categoria bate com a soma das transações listadas.
+  `TransactionRow` ganhou `subtitle`/`amountCaption` opcionais (data e conta, como no Figma) e
+  `ScreenGlow` foi pra `src/components` (agora usado por Gastos e Contas).
+
 **Falta:**
 - Login com Apple — precisa do Apple Developer Program (US$99/ano), que ainda não existe.
 - Segurança: biometria, bloqueio automático ao sair do app, trocar e-mail e aparelhos conectados
@@ -238,8 +248,8 @@ protótipo do Figma.
   os alertas de conexão já são gravados, mas só aparecem no contador do sino.
 - O app não espera o job terminar: depois de "Mudar categoria"/ocultar/sincronizar, a Home pode
   mostrar o número antigo por alguns segundos até o próximo refetch.
-- Detalhe da categoria (`GET /spending/category/:id`, gráfico dos últimos 6 meses) — **agora
-  desbloqueado**: `monthly_summaries` tem 13 meses reais com `byCategory`.
+- Detalhe da categoria: falta a "dica da IA" com "Criar limite" (Fase 3) e o lápis de "Editar
+  categoria" (nome, ícone, fixo/variável, incluir nas análises — sheet ainda não existe).
 - IA (`apps/mobile/app/(tabs)/ia.tsx`) continua 100% mockada — não é uma lacuna de "dados reais"
   como as outras, é que a função em si (chat com function calling) é escopo da Fase 3.
 - Perfil: o bloco de usuário/plano, o formulário de edição e o toggle de Segurança são reais. Os
@@ -250,6 +260,10 @@ protótipo do Figma.
 ---
 
 ## Decisões diferentes do `CONTEXTO.md` original (e por quê)
+
+- **Detalhe da categoria diz "compras", não "pedidos"** (Figma 28:396 usa "14 pedidos" porque o
+  exemplo é Delivery) — a tela serve pra qualquer categoria, e "pedidos de Moradia" não faz
+  sentido.
 
 - **Telas de conexão sem "Autorizado em" e sem "Lembrar amanhã"** (Figma 53:1306 e 83:2288) — o
   banco não guarda a data em que o consentimento foi dado (só `consent_expires_at`) e o Pluggy
