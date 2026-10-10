@@ -291,6 +291,10 @@ protótipo do Figma.
 - **Futuro: cards de fatura com a fatura real** de cada cartão conectado
   (`credit_cards.current_bill_cents`) e vencimento pelo dia de vencimento do cartão
   (`nextDueDateKey`, com teste).
+- **Conexões fictícias do seed removidas da conta do Bruno** (2026-10-10, ele mesmo rodou o
+  script): Itaú e Nubank, com 4 contas, 2 faturas, 8 transações ocultas e 3 exemplos de Casa e
+  Amigos ligados a elas (`household_expenses`, `split_expenses`). Ficou só a conexão MeuPluggy
+  real, com 1.135 transações. Rodar `db:seed` de novo recria tudo isso.
 - Validado com a conta real do Bruno em 2026-10-10: 9 parcelamentos ativos (os mesmos 9 contados
   direto nos dados do Pluggy); parcelas futuras de nov/26 a abr/27 somam R$ 513,20 — exatamente a
   diferença entre limite usado e fatura do Nubank. Os 5 parcelamentos fictícios do seed saíram.
@@ -299,10 +303,6 @@ protótipo do Figma.
 - **Assinaturas e fixos recorrentes (passo 5)** — `recurrences` ainda é do seed (8 assinaturas e
   4 fixos fictícios), e por isso o comprometido de cada mês ainda soma R$ 187,40 + R$ 1.032,75
   inventados em cima das parcelas reais.
-- **Tirar o Itaú e o Nubank fictícios** (conexões, contas, faturas `card_statements` e as 8
-  transações ocultas). O Bruno aprovou, mas o apagamento foi bloqueado pelo sistema de permissões
-  do Claude Code — falta rodar. Não afetam mais nenhum número (as faturas deles não aparecem
-  porque as conexões estão desconectadas); só aparecem como "Desconectado" em Contas e cartões.
 - Passos 6–8 (fixo/variável pela recorrência, fora do padrão, uso de assinaturas), "a vencer" do
   mês na sobra prevista (`dueUntilMonthEnd` ainda é 0), plano da semana, telas de Parcelas,
   Assinaturas e Fixos (§6.6; `/future/installments` etc. ainda são stubs), alertas e push, IA.
