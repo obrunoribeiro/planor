@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { requireUserId } from '../lib/auth';
 import { enqueueProcessTransactions } from '../jobs/queue';
 import { db } from '../lib/db';
+import { undetailedSpendingCents } from '../services/undetailedSpending';
 
 function currentMonthSaoPaulo(): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -257,7 +258,10 @@ export async function transactionRoutes(app: FastifyInstance) {
       : [];
     const categoryById = new Map(categoryRows.map((c) => [c.id, c]));
 
-    const totalCents = summary?.spentCents ?? 0;
+    // Compras que o banco ainda não detalhou entram no total do mês corrente (sem categoria — não
+    // dá pra saber de quê). Ver services/undetailedSpending.ts.
+    const undetailedCents = month === currentMonthSaoPaulo() ? await undetailedSpendingCents(userId) : 0;
+    const totalCents = (summary?.spentCents ?? 0) + undetailedCents;
     const categoryList = categoryIds
       .map((categoryId) => {
         const amountCents = byCategory[categoryId] ?? 0;
@@ -286,6 +290,9 @@ export async function transactionRoutes(app: FastifyInstance) {
         ? Math.round((summary.variableCents / (summary.fixedCents + summary.variableCents)) * 100)
         : 0,
       categories: categoryList,
+      undetailed: undetailedCents > 0
+        ? { amountCents: undetailedCents, pctOfTotal: totalCents > 0 ? Math.round((undetailedCents / totalCents) * 100) : 0 }
+        : null,
     };
   });
 

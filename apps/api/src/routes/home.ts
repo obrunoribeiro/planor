@@ -18,6 +18,7 @@ import { dueUntilMonthEnd, monthAbbrevPtBR, monthRangeSaoPaulo, previousMonthKey
 import type { FastifyInstance } from 'fastify';
 import { requireUserId } from '../lib/auth';
 import { db } from '../lib/db';
+import { undetailedSpendingCents } from '../services/undetailedSpending';
 
 function currentMonthSaoPaulo(): string {
   // "Mês" calcula em America/Sao_Paulo (CLAUDE.md, princípio 5), não em UTC.
@@ -136,9 +137,12 @@ export async function homeRoutes(app: FastifyInstance) {
       .where(and(eq(monthlySummaries.userId, userId), eq(monthlySummaries.month, previousMonthKey(month))));
 
     const monthlyIncomeCents = user.monthlyIncomeCents ?? 0;
-    const spentThisMonthCents = summary?.spentCents ?? 0;
-    // Só faz sentido no mês corrente — mês passado não tem mais nada "a vencer".
-    const dueUntilMonthEndCents = month === currentMonthSaoPaulo() ? await dueThisMonthCents(userId) : 0;
+    // Só faz sentido no mês corrente — mês passado não tem mais nada "a vencer" nem compra por
+    // detalhar.
+    const isCurrentMonth = month === currentMonthSaoPaulo();
+    const undetailedCents = isCurrentMonth ? await undetailedSpendingCents(userId) : 0;
+    const spentThisMonthCents = (summary?.spentCents ?? 0) + undetailedCents;
+    const dueUntilMonthEndCents = isCurrentMonth ? await dueThisMonthCents(userId) : 0;
 
     const [alertsCount] = await db
       .select({ value: sql<number>`count(*)::int` })
@@ -189,6 +193,8 @@ export async function homeRoutes(app: FastifyInstance) {
         monthlyIncomeCents,
         spentThisMonthCents,
         dueUntilMonthEndCents,
+        /** Já incluído em `spentThisMonthCents`. */
+        undetailedCents,
         projectedLeftoverCents: projectedLeftover({
           monthlyIncomeCents,
           spentThisMonthCents,

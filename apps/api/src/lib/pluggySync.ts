@@ -4,7 +4,7 @@
 // estabelecimento, categoria, agregados) roda depois, no job `process-transactions`.
 import { eq, sql } from 'drizzle-orm';
 import { accounts, connections, creditCards, institutions, transactions } from '@planor/db';
-import { currentBillCents } from '@planor/shared';
+import { currentBillCents, undetailedBillCents } from '@planor/shared';
 import type { connectionStatusEnum } from '@planor/db';
 import { enqueueProcessTransactions } from '../jobs/queue';
 import { alertOnStatusChange } from '../services/connectionJobs';
@@ -127,20 +127,27 @@ export async function syncItem(userId: string, itemId: string): Promise<{ connec
       const { creditLimit, balanceCloseDate, balanceDueDate } = pluggyAccount.creditData;
       // `.getUTCDate()`, não `.getDate()` — "2026-10-20" vira meia-noite UTC, e `.getDate()` lê no
       // fuso local da máquina (America/Sao_Paulo, -03:00), o que vira dia 19 por engano.
+      const billEntries = pluggyTransactions.map((tx) => ({
+        billMonth: tx.creditCardMetadata?.billForecastDate ?? null,
+        billId: tx.creditCardMetadata?.billId ?? null,
+        amountCents: -transactionCents(tx), // aqui gasto é positivo
+      }));
+      // O saldo da conta de crédito no Pluggy é o limite usado, não a fatura (ver
+      // `currentBillCents` em packages/shared).
+      const billCents = currentBillCents(accountValues.balanceCents, billEntries);
       const creditCardValues = {
         closingDay: balanceCloseDate ? new Date(balanceCloseDate).getUTCDate() : 1,
         dueDay: balanceDueDate ? new Date(balanceDueDate).getUTCDate() : 10,
         limitCents: creditLimit ? Math.round(creditLimit * 100) : null,
-        // O saldo da conta de crédito no Pluggy é o limite usado, não a fatura (ver
-        // `currentBillCents` em packages/shared).
-        currentBillCents: currentBillCents(
-          accountValues.balanceCents,
-          pluggyTransactions.map((tx) => ({
-            billMonth: tx.creditCardMetadata?.billForecastDate ?? null,
-            billId: tx.creditCardMetadata?.billId ?? null,
-            amountCents: -transactionCents(tx), // aqui gasto é positivo
-          })),
-        ),
+        currentBillCents: billCents,
+        // `balanceDueDate` é o vencimento da última fatura fechada (confirmado na conta do Bruno:
+        // 2026-09-18 em 10/10, igual ao da fatura fechada mais recente em `/bills`).
+        undetailedCents: undetailedBillCents({
+          currentBillCents: billCents,
+          entries: billEntries,
+          lastClosedDueDateKey: balanceDueDate ? balanceDueDate.slice(0, 10) : null,
+          todayKey: new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()),
+        }),
       };
       await db
         .insert(creditCards)

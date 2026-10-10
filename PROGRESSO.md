@@ -305,6 +305,15 @@ protótipo do Figma.
   cobranças das recorrências ativas até o fim do mês (atrasada até 5 dias ainda conta). `GET /home`
   usa no mês corrente (antes era sempre 0). Na conta do Bruno em 10/10: R$ 73,03 de parcelas +
   R$ 115,41 de assinaturas = R$ 188,44; sobra R$ 6.041,14.
+- **"Compras ainda não detalhadas pelo banco"** (decisão do Bruno em 2026-10-10): a parte da
+  fatura aberta que o banco ainda não mandou como transação entra no gasto do mês corrente (Home e
+  Gastos), como uma linha própria em Gastos ("Ainda não detalhadas", sem categoria).
+  `undetailedBillCents` em `packages/shared` (com teste) = fatura atual − gastos da fatura aberta
+  já recebidos; calculada na sincronização e gravada em `credit_cards.undetailed_cents` (migração
+  `0005_quiet_medusa.sql`, já aplicada). Na conta do Bruno: R$ 1.410,07 → gasto de outubro
+  R$ 1.814,66, sobra R$ 4.631,07. Vale 0 enquanto a última fatura fechada não venceu (aí a
+  diferença seria a fatura fechada, não compra nova) e quando não há lançamento conhecido na
+  fatura aberta.
 - **Rótulos das barras do "Já comprometido" na Home** mostravam reais ÷ 10 ("234" pra R$ 2.340);
   agora reais inteiros, como no Figma (25:197). Também corrigidas chaves React repetidas no card
   de parcelas/assinaturas da Home ("3/3" aparecia duas vezes).
@@ -323,11 +332,6 @@ protótipo do Figma.
 - Assinaturas: "cobrança duplicada" (§6.3, passo 5) ainda não é detectada — entra junto com os
   alertas. O plano da semana da Home ainda é do seed e cita assinaturas fictícias ("Streaming de
   vídeo e App de idiomas").
-- **Gasto do mês fica abaixo do real enquanto o banco não entrega as compras recentes**: em
-  10/10, o limite usado do cartão do Bruno tinha R$ 1.410,07 de compras que ainda não vieram como
-  transação (ver "Fatura atual" em "Decisões diferentes"). A sobra fica maior que a real até
-  elas chegarem. Dá pra mostrar essa diferença como "compras ainda não detalhadas" — decisão de
-  produto em aberto.
 - "Como calculamos a sobra" (`/sobra`, `GET /forecast/leftover`) ainda não existe.
 - Passos 6–8 (fixo/variável pela recorrência, fora do padrão, uso de assinaturas), plano da semana, telas de Parcelas,
   Assinaturas e Fixos (§6.6; `/future/installments` etc. ainda são stubs), alertas e push, IA.
@@ -346,6 +350,10 @@ protótipo do Figma.
   subiu 28%); comerciante com mais de 3 cobranças por mês não é assinatura (TikTok, padaria);
   IOF de compra internacional fica de fora; série sem cobrança há mais de 45 dias é considerada
   encerrada e sai da lista (a resposta "Uso pouco/Não uso" dela se perde se ela voltar depois).
+- **"Ainda não detalhadas" conta tudo como gasto do mês corrente** — a fatura aberta junta
+  compras do fim do mês anterior e deste mês, e sem a transação não dá pra saber a data. Quando o
+  banco manda as compras, elas saem dessa linha e entram nas categorias com a data certa. O
+  gráfico diário (sparkline) e a divisão fixo/variável da Home não incluem essa parte.
 - **Comprometido não inclui o mês corrente** — começa no mês seguinte (o mês corrente é "a vencer",
   outro número do §2). Recorrência mensal (até 35 dias) cobra uma vez por mês a partir do mês da
   próxima cobrança — somar o intervalo em dias faria um mês "pular" de vez em quando;

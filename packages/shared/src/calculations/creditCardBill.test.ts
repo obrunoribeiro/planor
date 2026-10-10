@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { currentBillCents, nextDueDateKey, type CardBillEntry } from './creditCardBill';
+import { currentBillCents, nextDueDateKey, undetailedBillCents, type CardBillEntry } from './creditCardBill';
 
 const entry = (billMonth: string | null, amountCents: number, billId: string | null = null): CardBillEntry => ({ billMonth, billId, amountCents });
 
@@ -45,5 +45,27 @@ describe('nextDueDateKey', () => {
     expect(nextDueDateKey(5, '2026-10-10')).toBe('2026-11-05');
     expect(nextDueDateKey(5, '2026-12-20')).toBe('2027-01-05');
     expect(nextDueDateKey(31, '2026-11-02')).toBe('2026-11-30');
+  });
+});
+
+describe('undetailedBillCents', () => {
+  const entries = [
+    entry('2026-09', 690_000, 'fechada'),
+    entry('2026-10', 505_616), // gastos da fatura aberta que o banco já mandou
+    entry('2026-10', -696_776), // pagamento da fatura anterior: não entra
+    entry('2026-11', 19_836), // parcela de fatura futura: não entra
+  ];
+
+  it('bate com a conta real do Bruno em 2026-10-10 (R$ 6.466,23 − R$ 5.056,16)', () => {
+    expect(undetailedBillCents({ currentBillCents: 646_623, entries, lastClosedDueDateKey: '2026-09-18', todayKey: '2026-10-10' })).toBe(141_007);
+  });
+
+  it('é 0 enquanto a última fatura fechada não venceu (o limite ainda tem ela inteira)', () => {
+    expect(undetailedBillCents({ currentBillCents: 1_300_000, entries, lastClosedDueDateKey: '2026-10-18', todayKey: '2026-10-12' })).toBe(0);
+  });
+
+  it('é 0 sem lançamento conhecido na fatura aberta ou sem data da última fatura', () => {
+    expect(undetailedBillCents({ currentBillCents: 50_000, entries: [entry('2026-09', 1000, 'fechada')], lastClosedDueDateKey: '2026-09-18', todayKey: '2026-10-10' })).toBe(0);
+    expect(undetailedBillCents({ currentBillCents: 646_623, entries, lastClosedDueDateKey: null, todayKey: '2026-10-10' })).toBe(0);
   });
 });
