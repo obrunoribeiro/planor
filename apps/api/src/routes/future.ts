@@ -1,7 +1,7 @@
 // Linha do tempo, parcelas, assinaturas e fixos — CONTEXTO.md §6.6, §8.
 import { and, desc, eq, inArray, isNotNull, ne } from 'drizzle-orm';
-import { accounts, committedByMonth, connections, creditCards, installmentPlans, institutions, recurrences, transactions } from '@planor/db';
-import { installmentPlanProgress, latestPriceChange, monthAbbrevPtBR, monthKeySaoPaulo, monthNamePtBR, nextDueDateKey } from '@planor/shared';
+import { accounts, committedByMonth, connections, creditCards, installmentPlans, institutions, manualRecurringBills, recurrences, transactions } from '@planor/db';
+import { addMonthsToKey, installmentPlanProgress, latestPriceChange, monthAbbrevPtBR, monthKeySaoPaulo, monthNamePtBR, nextDueDateKey } from '@planor/shared';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { requireUserId } from '../lib/auth';
@@ -40,7 +40,8 @@ export async function futureRoutes(app: FastifyInstance) {
       .from(recurrences)
       .where(and(eq(recurrences.userId, userId), eq(recurrences.kind, 'recurring_bill'), eq(recurrences.status, 'active')));
 
-    const billNames = bills.map((b) => b.merchantName);
+    const manualBills = await db.select().from(manualRecurringBills).where(eq(manualRecurringBills.userId, userId));
+    const billNames = [...bills.map((b) => b.merchantName), ...manualBills.map((b) => b.name)];
     const billsDescription =
       billNames.length <= 2
         ? billNames.join(' e ')
@@ -194,7 +195,95 @@ export async function futureRoutes(app: FastifyInstance) {
       items,
     };
   });
-  app.get('/future/bills', async (_req, reply) => notImplemented(reply, 'Fixos recorrentes — Fase 3 (§6.6)'));
+  // Fixos recorrentes (§6.6): os detectados nas transações (`recurrences`, recurring_bill) + os
+  // cadastrados à mão em "Nova conta fixa" (`manual_recurring_bills`).
+  app.get('/future/bills', async (request, reply) => {
+    const userId = await requireUserId(request, reply);
+    if (!userId) return;
+
+    const [detected, manual] = await Promise.all([
+      db
+        .select()
+        .from(recurrences)
+        .where(and(eq(recurrences.userId, userId), eq(recurrences.kind, 'recurring_bill'), eq(recurrences.status, 'active'))),
+      db.select().from(manualRecurringBills).where(eq(manualRecurringBills.userId, userId)),
+    ]);
+
+    // "Pago com" dos detectados = banco da cobrança mais recente.
+    const ids = detected.map((d) => d.id);
+    const charges = ids.length
+      ? await db
+          .select({ recurrenceId: transactions.recurrenceId, bank: institutions.name })
+          .from(transactions)
+          .innerJoin(accounts, eq(accounts.id, transactions.accountId))
+          .innerJoin(connections, eq(connections.id, accounts.connectionId))
+          .innerJoin(institutions, eq(institutions.id, connections.institutionId))
+          .where(inArray(transactions.recurrenceId, ids))
+          .orderBy(desc(transactions.postedAt))
+      : [];
+    const dayOf = (date: Date) => Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', day: '2-digit' }).format(date));
+
+    const items = [
+      ...detected.map((d) => ({
+        id: d.id,
+        source: 'detected' as const,
+        name: d.merchantName,
+        amountCents: d.amountCents,
+        day: d.nextChargeAt ? dayOf(d.nextChargeAt) : null,
+        paidWith: charges.find((c) => c.recurrenceId === d.id)?.bank ?? null,
+        estimated: d.estimated,
+      })),
+      ...manual.map((m) => ({
+        id: m.id,
+        source: 'manual' as const,
+        name: m.name,
+        amountCents: m.amountCents,
+        day: m.day,
+        paidWith: m.paidWith,
+        estimated: false,
+      })),
+    ].sort((a, b) => (a.day ?? 99) - (b.day ?? 99));
+
+    return {
+      nextMonth: addMonthsToKey(monthKeySaoPaulo(new Date()), 1),
+      monthlyCents: items.reduce((sum, i) => sum + i.amountCents, 0),
+      items,
+    };
+  });
+
+  const newBill = z.object({
+    name: z.string().trim().min(1).max(60),
+    amountCents: z.number().int().positive(),
+    day: z.number().int().min(1).max(31),
+    paidWith: z.string().trim().max(60).nullable().optional(),
+  });
+  app.post('/future/bills', async (request, reply) => {
+    const userId = await requireUserId(request, reply);
+    if (!userId) return;
+    const body = newBill.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: 'invalid_request' });
+
+    const [created] = await db
+      .insert(manualRecurringBills)
+      .values({ userId, name: body.data.name, amountCents: body.data.amountCents, day: body.data.day, paidWith: body.data.paidWith ?? null })
+      .returning();
+    await enqueueProcessTransactions(userId); // recalcula o comprometido
+    return reply.code(201).send({ id: created!.id });
+  });
+
+  // Só conta cadastrada à mão; as detectadas saem sozinhas quando param de cobrar.
+  app.delete('/future/bills/:id', async (request, reply) => {
+    const userId = await requireUserId(request, reply);
+    if (!userId) return;
+    const { id } = request.params as { id: string };
+    const [deleted] = await db
+      .delete(manualRecurringBills)
+      .where(and(eq(manualRecurringBills.id, id), eq(manualRecurringBills.userId, userId)))
+      .returning({ id: manualRecurringBills.id });
+    if (!deleted) return reply.code(404).send({ error: 'bill_not_found' });
+    await enqueueProcessTransactions(userId);
+    return reply.code(204).send();
+  });
   app.get('/future/statements/:id', async (_req, reply) => notImplemented(reply, 'Fatura do cartão — Fase 3 (§6.6)'));
   // "Você usa esse serviço?" e "Já cancelei" / desfazer (§6.6). O lembrete de 3 dias antes da
   // cobrança fica pra quando existir push (§6.9) — ver PROGRESSO.md.

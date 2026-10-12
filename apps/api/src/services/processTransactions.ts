@@ -7,12 +7,13 @@
 // fixos recorrentes) e passo 9 (`monthly_summaries` e `committed_by_month`). Ficam pra depois:
 // fixo/variável pela recorrência (6), fora do padrão (7) e plano da semana (9) — ver PROGRESSO.md.
 import { and, eq, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
-import { accounts, alerts, categories, categoryRules, committedByMonth, installmentPlans, monthlySummaries, recurrences, transactions } from '@planor/db';
+import { accounts, alerts, categories, categoryRules, committedByMonth, installmentPlans, manualRecurringBills, monthlySummaries, recurrences, transactions } from '@planor/db';
 import {
   buildMonthlySummaries,
   categorizeTransaction,
   detectInstallmentPlans,
   detectRecurrences,
+  manualBillAsRecurrence,
   isCardBillPayment,
   monthKeySaoPaulo,
   normalizeForMatch,
@@ -389,12 +390,18 @@ async function recomputeCommittedByMonth(userId: string, referenceMonth: string,
     .select({ kind: recurrences.kind, amountCents: recurrences.amountCents, cadenceDays: recurrences.cadenceDays, nextChargeAt: recurrences.nextChargeAt })
     .from(recurrences)
     .where(and(eq(recurrences.userId, userId), eq(recurrences.status, 'active')));
+  const manualBills = await db
+    .select({ amountCents: manualRecurringBills.amountCents, day: manualRecurringBills.day })
+    .from(manualRecurringBills)
+    .where(eq(manualRecurringBills.userId, userId));
+  const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
 
   const months = projectCommittedByMonth({
     referenceMonth,
     horizon: COMMITTED_HORIZON_MONTHS,
     installments: plans,
-    recurrences: activeRecurrences,
+    // "Nova conta fixa" cadastrada à mão entra igual a um fixo recorrente detectado.
+    recurrences: [...activeRecurrences, ...manualBills.map((bill) => manualBillAsRecurrence(bill, todayKey))],
   });
 
   await db.transaction(async (tx) => {

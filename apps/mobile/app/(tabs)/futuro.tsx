@@ -40,7 +40,6 @@ function CommittedRow({
   subtitle: string;
   amountCents: number;
   last?: boolean;
-  /** TODO: Fixos ainda não tem tela — §6.6. */
   onPress?: () => void;
 }) {
   return (
@@ -182,6 +181,7 @@ export default function FuturoScreen() {
                 title="Fixos recorrentes"
                 subtitle={currentMonth.bills.description}
                 amountCents={currentMonth.bills.amountCents}
+                onPress={() => router.push('/futuro/fixos')}
                 last
               />
             </View>

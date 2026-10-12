@@ -89,3 +89,29 @@ export function projectCommittedByMonth(input: {
   }
   return result;
 }
+
+/**
+ * "Nova conta fixa" cadastrada à mão (§6.6, `manual_recurring_bills`) no mesmo formato das
+ * recorrências detectadas, pra entrar no comprometido e no "a vencer" pelas mesmas regras. A
+ * próxima cobrança é o próximo dia `day` a partir de hoje (dia que já passou neste mês conta como
+ * pago — o app não tem como saber, e na dúvida não soma gasto que pode não existir).
+ */
+export function manualBillAsRecurrence(bill: { amountCents: AmountCents; day: number }, todayKey: string): CommittedRecurrence {
+  const year = Number(todayKey.slice(0, 4));
+  const month = Number(todayKey.slice(5, 7));
+  const today = Number(todayKey.slice(8, 10));
+  const lastDayOf = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+
+  let y = year;
+  let m = month;
+  if (Math.min(bill.day, lastDayOf(y, m)) < today) {
+    m += 1;
+    if (m === 13) {
+      m = 1;
+      y += 1;
+    }
+  }
+  const day = Math.min(bill.day, lastDayOf(y, m));
+  // Meio-dia em São Paulo (15h UTC), pra o mês não escorregar com o fuso.
+  return { kind: 'recurring_bill', amountCents: bill.amountCents, cadenceDays: 30, nextChargeAt: new Date(Date.UTC(y, m - 1, day, 15)) };
+}
