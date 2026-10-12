@@ -3,13 +3,28 @@
 // (CONTEXTO.md §6.2, §6.3 passo 1 — dedup por id externo). O resto do pipeline (nome do
 // estabelecimento, categoria, agregados) roda depois, no job `process-transactions`.
 import { eq, sql } from 'drizzle-orm';
-import { accounts, connections, creditCards, institutions, transactions } from '@planor/db';
-import { currentBillCents, undetailedBillCents } from '@planor/shared';
+import {
+  accounts,
+  cardStatements,
+  connections,
+  creditCards,
+  institutions,
+  transactions,
+} from '@planor/db';
+import { cardBillSummary, type ClosedCardBill } from '@planor/shared';
 import type { connectionStatusEnum } from '@planor/db';
 import { enqueueProcessTransactions } from '../jobs/queue';
 import { alertOnStatusChange } from '../services/connectionJobs';
 import { db } from './db';
-import { getItem, listAccounts, listTransactions, type PluggyAccount, type PluggyItem, type PluggyTransaction } from './pluggy';
+import {
+  getItem,
+  listAccounts,
+  listBills,
+  listTransactions,
+  type PluggyAccount,
+  type PluggyItem,
+  type PluggyTransaction,
+} from './pluggy';
 
 type ConnectionStatus = (typeof connectionStatusEnum.enumValues)[number];
 
@@ -22,6 +37,17 @@ function mapAccountType(account: PluggyAccount): 'checking' | 'savings' | 'credi
   return account.subtype === 'SAVINGS_ACCOUNT' ? 'savings' : 'checking';
 }
 
+/** Dia do mês mais frequente entre as datas (empate: o menor). */
+function usualDay(dates: string[]): number | null {
+  if (dates.length === 0) return null;
+  const counts = new Map<number, number>();
+  for (const date of dates) {
+    const day = new Date(date).getUTCDate();
+    counts.set(day, (counts.get(day) ?? 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]![0];
+}
+
 /** Valor no padrão do banco (gasto negativo). Usa o `type` explícito (DEBIT/CREDIT) em vez do
  * sinal do valor — o sinal do Pluggy varia por tipo de conta (confirmado diferente em cartão de
  * crédito) e o type não. */
@@ -31,14 +57,19 @@ function transactionCents(tx: PluggyTransaction): number {
 }
 
 function mapConnectionStatus(item: PluggyItem): ConnectionStatus {
-  if (item.consentExpiresAt && new Date(item.consentExpiresAt).getTime() < Date.now()) return 'consent_expired';
-  if (item.executionStatus === 'SUCCESS' || item.executionStatus === 'PARTIAL_SUCCESS') return 'connected';
+  if (item.consentExpiresAt && new Date(item.consentExpiresAt).getTime() < Date.now())
+    return 'consent_expired';
+  if (item.executionStatus === 'SUCCESS' || item.executionStatus === 'PARTIAL_SUCCESS')
+    return 'connected';
   return 'error';
 }
 
 async function upsertInstitution(connector: PluggyItem['connector']) {
   const aggregatorId = String(connector.id);
-  const [existing] = await db.select().from(institutions).where(eq(institutions.aggregatorId, aggregatorId));
+  const [existing] = await db
+    .select()
+    .from(institutions)
+    .where(eq(institutions.aggregatorId, aggregatorId));
   if (existing) return existing;
 
   const [created] = await db
@@ -48,14 +79,20 @@ async function upsertInstitution(connector: PluggyItem['connector']) {
     .returning();
   if (created) return created;
 
-  const [raceWinner] = await db.select().from(institutions).where(eq(institutions.aggregatorId, aggregatorId));
+  const [raceWinner] = await db
+    .select()
+    .from(institutions)
+    .where(eq(institutions.aggregatorId, aggregatorId));
   return raceWinner!;
 }
 
 /** Cria ou atualiza a `connections` + `accounts` (+ `credit_cards`) a partir de um item do
  * Pluggy, e importa as transações de cada conta. Idempotente — pode rodar de novo sem duplicar
  * (índices únicos em `aggregator_item_id`, `external_id` e `(account_id, external_id)`). */
-export async function syncItem(userId: string, itemId: string): Promise<{ connectionId: string; accountsSynced: number; transactionsImported: number }> {
+export async function syncItem(
+  userId: string,
+  itemId: string,
+): Promise<{ connectionId: string; accountsSynced: number; transactionsImported: number }> {
   const item = await getItem(itemId);
 
   // `clientUserId` é o que a gente mesmo definiu ao criar o connect token (ver `/connections/token`
@@ -70,14 +107,20 @@ export async function syncItem(userId: string, itemId: string): Promise<{ connec
   // Segunda trava, redundante de propósito: se esse item já tem uma `connections` registrada
   // pra outro usuário no nosso banco, recusa mesmo que o `clientUserId` acima (por algum motivo)
   // tivesse batido.
-  const [existingForAnyUser] = await db.select().from(connections).where(eq(connections.aggregatorItemId, item.id));
+  const [existingForAnyUser] = await db
+    .select()
+    .from(connections)
+    .where(eq(connections.aggregatorItemId, item.id));
   if (existingForAnyUser && existingForAnyUser.userId !== userId) {
     throw new PluggyOwnershipError(`Item ${itemId} já está associado a outro usuário.`);
   }
 
   const institution = await upsertInstitution(item.connector);
 
-  const [existingConnection] = await db.select().from(connections).where(eq(connections.aggregatorItemId, item.id));
+  const [existingConnection] = await db
+    .select()
+    .from(connections)
+    .where(eq(connections.aggregatorItemId, item.id));
   const connectionValues = {
     userId,
     institutionId: institution.id,
@@ -90,7 +133,13 @@ export async function syncItem(userId: string, itemId: string): Promise<{ connec
   };
 
   const connection = existingConnection
-    ? (await db.update(connections).set(connectionValues).where(eq(connections.id, existingConnection.id)).returning())[0]!
+    ? (
+        await db
+          .update(connections)
+          .set(connectionValues)
+          .where(eq(connections.id, existingConnection.id))
+          .returning()
+      )[0]!
     : (await db.insert(connections).values(connectionValues).returning())[0]!;
 
   await alertOnStatusChange({
@@ -106,7 +155,10 @@ export async function syncItem(userId: string, itemId: string): Promise<{ connec
   let transactionsImported = 0;
 
   for (const pluggyAccount of pluggyAccounts) {
-    const [existingAccount] = await db.select().from(accounts).where(eq(accounts.externalId, pluggyAccount.id));
+    const [existingAccount] = await db
+      .select()
+      .from(accounts)
+      .where(eq(accounts.externalId, pluggyAccount.id));
     const accountValues = {
       connectionId: connection.id,
       userId,
@@ -118,36 +170,86 @@ export async function syncItem(userId: string, itemId: string): Promise<{ connec
     };
 
     const account = existingAccount
-      ? (await db.update(accounts).set(accountValues).where(eq(accounts.id, existingAccount.id)).returning())[0]!
+      ? (
+          await db
+            .update(accounts)
+            .set(accountValues)
+            .where(eq(accounts.id, existingAccount.id))
+            .returning()
+        )[0]!
       : (await db.insert(accounts).values(accountValues).returning())[0]!;
 
     const pluggyTransactions = await listTransactions(pluggyAccount.id);
 
     if (pluggyAccount.type === 'CREDIT' && pluggyAccount.creditData) {
       const { creditLimit, balanceCloseDate, balanceDueDate } = pluggyAccount.creditData;
-      // `.getUTCDate()`, não `.getDate()` — "2026-10-20" vira meia-noite UTC, e `.getDate()` lê no
-      // fuso local da máquina (America/Sao_Paulo, -03:00), o que vira dia 19 por engano.
+
+      // Faturas fechadas (com total e pagamentos) — §6.6 "Fatura do cartão". A mais recente é a
+      // que separa o que já fechou do que ainda está aberto (ver `cardBillSummary`).
+      const bills = (await listBills(pluggyAccount.id)).sort((a, b) =>
+        a.dueDate.localeCompare(b.dueDate),
+      );
+      for (const bill of bills) {
+        const totalCents = Math.round(bill.totalAmount * 100);
+        const paidCents = Math.round(
+          (bill.payments ?? []).reduce((sum, p) => sum + p.amount, 0) * 100,
+        );
+        const statement = {
+          closingDate: new Date(bill.billClosingDate ?? bill.dueDate),
+          dueDate: new Date(bill.dueDate),
+          totalCents,
+          paidCents,
+          status: paidCents >= totalCents ? ('paid' as const) : ('closed' as const),
+        };
+        await db
+          .insert(cardStatements)
+          .values({ accountId: account.id, period: bill.dueDate.slice(0, 7), ...statement })
+          .onConflictDoUpdate({
+            target: [cardStatements.accountId, cardStatements.period],
+            set: statement,
+          });
+      }
+      const latest = bills.at(-1);
+      const lastClosed: ClosedCardBill | null = latest
+        ? {
+            month: latest.dueDate.slice(0, 7),
+            totalCents: Math.round(latest.totalAmount * 100),
+            paidCents: Math.round(
+              (latest.payments ?? []).reduce((sum, p) => sum + p.amount, 0) * 100,
+            ),
+            dueDateKey: latest.dueDate.slice(0, 10),
+          }
+        : null;
+
       const billEntries = pluggyTransactions.map((tx) => ({
         billMonth: tx.creditCardMetadata?.billForecastDate ?? null,
         billId: tx.creditCardMetadata?.billId ?? null,
         amountCents: -transactionCents(tx), // aqui gasto é positivo
       }));
-      // O saldo da conta de crédito no Pluggy é o limite usado, não a fatura (ver
-      // `currentBillCents` em packages/shared).
-      const billCents = currentBillCents(accountValues.balanceCents, billEntries);
+      // O saldo da conta de crédito no Pluggy é o limite usado, não a fatura.
+      const summary = cardBillSummary({
+        usedLimitCents: accountValues.balanceCents,
+        entries: billEntries,
+        lastClosed,
+      });
+
+      // Dia de fechamento/vencimento: o mais comum nas últimas 3 faturas — quando cai em fim de
+      // semana o banco empurra pro dia útil (Nubank: 18/08, 18/09, 19/10 porque 18/10 é domingo).
+      // O Nubank manda `balanceCloseDate` nulo. `.getUTCDate()`, não `.getDate()` — "2026-10-20"
+      // vira meia-noite UTC, e `.getDate()` lê no fuso local (-03:00), o que vira dia 19.
+      const recent = bills.slice(-3);
+      const closingDay =
+        usualDay(recent.map((b) => b.billClosingDate).filter((d): d is string => !!d)) ??
+        (balanceCloseDate ? new Date(balanceCloseDate).getUTCDate() : 1);
+      const dueDay =
+        usualDay(recent.map((b) => b.dueDate)) ??
+        (balanceDueDate ? new Date(balanceDueDate).getUTCDate() : 10);
       const creditCardValues = {
-        closingDay: balanceCloseDate ? new Date(balanceCloseDate).getUTCDate() : 1,
-        dueDay: balanceDueDate ? new Date(balanceDueDate).getUTCDate() : 10,
+        closingDay,
+        dueDay,
         limitCents: creditLimit ? Math.round(creditLimit * 100) : null,
-        currentBillCents: billCents,
-        // `balanceDueDate` é o vencimento da última fatura fechada (confirmado na conta do Bruno:
-        // 2026-09-18 em 10/10, igual ao da fatura fechada mais recente em `/bills`).
-        undetailedCents: undetailedBillCents({
-          currentBillCents: billCents,
-          entries: billEntries,
-          lastClosedDueDateKey: balanceDueDate ? balanceDueDate.slice(0, 10) : null,
-          todayKey: new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()),
-        }),
+        currentBillCents: summary.openBillCents,
+        undetailedCents: summary.undetailedCents,
       };
       await db
         .insert(creditCards)
@@ -190,5 +292,9 @@ export async function syncItem(userId: string, itemId: string): Promise<{ connec
   // Sempre, mesmo sem transação nova: o saldo/conta pode ter mudado, e o job é barato e idempotente.
   await enqueueProcessTransactions(userId);
 
-  return { connectionId: connection.id, accountsSynced: pluggyAccounts.length, transactionsImported };
+  return {
+    connectionId: connection.id,
+    accountsSynced: pluggyAccounts.length,
+    transactionsImported,
+  };
 }

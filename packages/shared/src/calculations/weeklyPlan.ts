@@ -4,7 +4,8 @@
 // de conclusão. Tipos combinados com o Bruno em 2026-10-10 (os exemplos do CONTEXTO dependem de
 // metas e da marcação de uso das assinaturas, que ainda não existem):
 //   - `income`: a renda não está preenchida → conclui sozinho quando for preenchida;
-//   - `card_bill`: uma fatura vence nesta semana → o usuário marca;
+//   - `card_bill`: uma fatura vence nesta semana → o usuário marca, ou conclui sozinho quando o
+//     banco informa o pagamento;
 //   - `subscription_usage`: assinaturas ativas sem o uso marcado ("Marcar assinaturas sem uso",
 //     exemplo do CONTEXTO) → conclui sozinho quando todas tiverem o uso marcado;
 //   - `category_limit`: uma categoria variável está acima do ritmo dos últimos 3 meses →
@@ -197,6 +198,8 @@ export type WeeklyPlanLiveData = {
   weekSpentByCategory: Record<string, AmountCents>;
   /** Dos `transactionIds` dos itens `categorize`, os que ainda estão sem categoria. */
   stillUncategorizedIds: string[];
+  /** Faturas ainda a pagar agora (as mesmas de `cardBills`). A do item que sumiu daqui foi paga. */
+  cardBillsToPay: { bank: string; dueDateKey: string }[];
 };
 
 /** Atualiza descrição (progresso) e conclusão automática com o dado de agora. Não desmarca o que
@@ -213,6 +216,12 @@ export function evaluateWeeklyPlan(items: WeeklyPlanItem[], live: WeeklyPlanLive
 
     if (next.type === 'income' && live.incomeSet) complete();
     if (next.type === 'subscription_usage' && live.subscriptionsWithoutUsage === 0) complete();
+    if (
+      next.type === 'card_bill' &&
+      !live.cardBillsToPay.some((bill) => bill.bank === next.data.bank && bill.dueDateKey === next.data.dueDateKey)
+    ) {
+      complete();
+    }
 
     if (next.type === 'category_limit' && next.data.categoryId && next.data.limitCents !== undefined) {
       const spent = live.weekSpentByCategory[next.data.categoryId] ?? 0;

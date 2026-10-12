@@ -77,15 +77,23 @@ export const creditCards = pgTable('credit_cards', {
   undetailedCents: integer('undetailed_cents'),
 });
 
-export const cardStatements = pgTable('card_statements', {
-  id: id(),
-  accountId: uuid('account_id')
-    .notNull()
-    .references(() => accounts.id, { onDelete: 'cascade' }),
-  /** Mês de referência da fatura, formato "YYYY-MM". */
-  period: text('period').notNull(),
-  closingDate: timestamp('closing_date', { withTimezone: true }).notNull(),
-  dueDate: timestamp('due_date', { withTimezone: true }).notNull(),
-  totalCents: integer('total_cents').notNull().default(0),
-  status: cardStatementStatusEnum('status').notNull().default('open'),
-});
+export const cardStatements = pgTable(
+  'card_statements',
+  {
+    id: id(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    /** Mês de referência da fatura, formato "YYYY-MM". */
+    period: text('period').notNull(),
+    closingDate: timestamp('closing_date', { withTimezone: true }).notNull(),
+    dueDate: timestamp('due_date', { withTimezone: true }).notNull(),
+    totalCents: integer('total_cents').notNull().default(0),
+    /** Soma dos pagamentos que o banco informou. `status` vira `paid` quando cobre o total. */
+    paidCents: integer('paid_cents').notNull().default(0),
+    status: cardStatementStatusEnum('status').notNull().default('open'),
+  },
+  /** Só faturas fechadas são gravadas (vêm do `/bills` do agregador); a aberta é calculada em
+   * `credit_cards.current_bill_cents`. Uma por cartão e mês de vencimento. */
+  (table) => [uniqueIndex('card_statements_account_period_idx').on(table.accountId, table.period)],
+);

@@ -165,7 +165,27 @@ export type FutureTimelineResponse = {
     subscriptions: { count: number; amountCents: number };
     bills: { description: string; amountCents: number };
   } | null;
-  statements: { bank: string; amountCents: number; dueDate: string }[];
+  statements: { accountId: string; bank: string; amountCents: number; dueDate: string }[];
+};
+
+/** `GET /future/statements/:accountId` — fatura do cartão (§6.6). */
+export type CardStatementResponse = {
+  accountId: string;
+  bank: string;
+  /** Mês do vencimento, "YYYY-MM". */
+  month: string;
+  /** `closed` = já fechou; `open` = ainda recebe compras; `future` = só parcelas já lançadas. */
+  kind: 'closed' | 'open' | 'future';
+  paid: boolean;
+  totalCents: number;
+  /** "YYYY-MM-DD". */
+  closingDate: string;
+  dueDate: string;
+  installments: { totalCents: number; items: { name: string; number: number | null; count: number | null; amountCents: number }[] };
+  subscriptions: { totalCents: number; count: number; unusedCount: number };
+  bills: { totalCents: number; items: { name: string; amountCents: number }[] };
+  otherPurchases: { totalCents: number; count: number };
+  undetailedCents: number;
 };
 
 export type MeResponse = {

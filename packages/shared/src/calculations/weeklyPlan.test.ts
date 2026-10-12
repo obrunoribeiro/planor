@@ -83,7 +83,7 @@ describe('buildWeeklyPlan', () => {
     expect(items[0]).toMatchObject({ type: 'subscription_usage', actionRoute: '/futuro/assinaturas' });
     expect(plain(items[0]!.description)).toBe('6 assinaturas somam R$ 135,31 por mês. As que você não usa entram nas sugestões de corte.');
 
-    const live = { todayKey: '2026-10-10', incomeSet: true, weekSpentByCategory: {}, stillUncategorizedIds: [] };
+    const live = { todayKey: '2026-10-10', incomeSet: true, weekSpentByCategory: {}, stillUncategorizedIds: [], cardBillsToPay: [] };
     expect(evaluateWeeklyPlan(items, { ...live, subscriptionsWithoutUsage: 2 })[0]!.completed).toBe(false);
     expect(evaluateWeeklyPlan(items, { ...live, subscriptionsWithoutUsage: 0 })[0]).toMatchObject({ completed: true, completedAutomatically: true });
   });
@@ -102,7 +102,23 @@ describe('buildWeeklyPlan', () => {
 });
 
 describe('evaluateWeeklyPlan', () => {
-  const live = { todayKey: '2026-10-10', incomeSet: false, subscriptionsWithoutUsage: 1, weekSpentByCategory: {}, stillUncategorizedIds: [] as string[] };
+  const live = {
+    todayKey: '2026-10-10',
+    incomeSet: false,
+    subscriptionsWithoutUsage: 1,
+    weekSpentByCategory: {},
+    stillUncategorizedIds: [] as string[],
+    cardBillsToPay: [] as { bank: string; dueDateKey: string }[],
+  };
+
+  it('conclui sozinho a fatura quando ela sai da lista a pagar (o banco informou o pagamento)', () => {
+    const [bill] = buildWeeklyPlan({ ...base, todayKey: '2026-10-12', cardBills: [{ bank: 'Nubank', amountCents: 646_623, dueDateKey: '2026-10-18' }] });
+    const pending = [{ bank: 'Nubank', dueDateKey: '2026-10-18' }];
+    expect(evaluateWeeklyPlan([bill!], { ...live, cardBillsToPay: pending })[0]!.completed).toBe(false);
+    // Paga: o que fica a pagar é a fatura aberta, que vence no mês seguinte.
+    const next = [{ bank: 'Nubank', dueDateKey: '2026-11-18' }];
+    expect(evaluateWeeklyPlan([bill!], { ...live, cardBillsToPay: next })[0]).toMatchObject({ completed: true, completedAutomatically: true });
+  });
 
   it('conclui sozinho a renda e a categorização; não desmarca o que o usuário marcou', () => {
     const [income, bill, categorize] = buildWeeklyPlan({

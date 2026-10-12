@@ -3,7 +3,7 @@
 // categorias e faixa de valor." "Buscas recentes" fica pra depois (ver PROGRESSO.md).
 import { formatCentsWithSign, reaisToCents } from '@planor/shared';
 import { Checkbox, Chip, colors, EmptyState, Icon, ScreenHeader, Sheet, Skeleton, space, TextField, typography } from '@planor/ui';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { TransactionRow } from '@/features/gastos/TransactionRow';
@@ -41,7 +41,9 @@ export default function TransacoesScreen() {
   const [searchVisible, setSearchVisible] = useState(false);
   const [search, setSearch] = useState('');
   const [filtersVisible, setFiltersVisible] = useState(false);
-  const [accountIds, setAccountIds] = useState<string[]>([]);
+  // "Ver transações do cartão" (fatura do cartão) abre já filtrado pela conta.
+  const params = useLocalSearchParams<{ accountId?: string }>();
+  const [accountIds, setAccountIds] = useState<string[]>(params.accountId ? [params.accountId] : []);
   const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [minText, setMinText] = useState('');
   const [maxText, setMaxText] = useState('');

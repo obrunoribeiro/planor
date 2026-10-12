@@ -7,6 +7,7 @@ import type {
   CategoryListItem,
   ConnectionListItem,
   FutureTimelineResponse,
+  CardStatementResponse,
   FixedBillsResponse,
   HomeResponse,
   InstallmentsResponse,
@@ -102,6 +103,15 @@ export function useUpdateSubscriptionMutation(id: string) {
         void queryClient.invalidateQueries({ queryKey: [key] });
       }
     },
+  });
+}
+
+export function useCardStatementQuery(accountId: string) {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['card-statement', accountId],
+    queryFn: () => apiFetch<CardStatementResponse>(`/future/statements/${accountId}`, { accessToken: accessToken! }),
+    enabled: !!accessToken && !!accountId,
   });
 }
 
