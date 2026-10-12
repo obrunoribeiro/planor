@@ -14,12 +14,14 @@
     "pipeline:reprocess": "tsx src/scripts/reprocess-transactions.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.79",
     "@fastify/cors": "^10.0.2",
     "@fastify/multipart": "^10.1.2",
     "@fastify/sensible": "^6.0.2",
     "@planor/db": "workspace:*",
     "@planor/shared": "workspace:*",
     "@supabase/supabase-js": "^2.47.10",
+    "ai": "^7.0.138",
     "dotenv": "^16.4.7",
     "fastify": "^5.2.0",
     "pg-boss": "^10.1.5",

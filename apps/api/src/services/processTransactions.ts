@@ -35,6 +35,7 @@ import {
   type ExpenseKind,
 } from '@planor/shared';
 import { db } from '../lib/db';
+import { categorizeWithAi } from './aiCategorization';
 
 type TransactionPatch = {
   id: string;
@@ -73,7 +74,7 @@ async function applyPatches(patches: TransactionPatch[]) {
 }
 
 /** Passos 1 e 2 sobre todas as transações do usuário. Nunca sobrescreve escolha do usuário:
- * categoria `manual` (ou `ai`, quando existir) fica como está, `expenseKind` já preenchido
+ * categoria `manual` fica como está (a da IA só dá lugar a uma regra), `expenseKind` já preenchido
  * também, e `isTransfer` só é ligado, nunca desligado. */
 async function normalizeAndCategorize(userId: string): Promise<{ updated: number }> {
   const [rules, categoryRows, rows] = await Promise.all([
@@ -128,7 +129,9 @@ async function normalizeAndCategorize(userId: string): Promise<{ updated: number
     let categorySource = row.categorySource;
     let expenseKind = row.expenseKind;
 
-    const userOwnsCategory = categorySource === 'manual' || categorySource === 'ai';
+    // Categoria escolhida pelo usuário nunca muda. A da IA dá lugar a uma regra (do usuário ou
+    // global) se aparecer uma que case; sem regra, fica.
+    const userOwnsCategory = categorySource === 'manual';
     if (!userOwnsCategory && !isTransfer) {
       const result = categorizeTransaction(
         { descriptionRaw: row.descriptionRaw, merchantName, amountCents: row.amountCents },
@@ -525,6 +528,14 @@ export async function processUserTransactions(userId: string) {
   const now = new Date();
   const referenceMonth = monthKeySaoPaulo(now);
   const { updated } = await normalizeAndCategorize(userId);
+  // Passo 2.3: o que as regras não pegaram vai pra IA (nunca derruba o pipeline).
+  const ai = await categorizeWithAi(userId).catch((err: unknown) => ({
+    skipped: String(err),
+    asked: 0,
+    applied: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+  }));
   // Parcelamentos antes dos resumos: a categoria escolhida pro parcelamento vai pras parcelas novas.
   const plans = await syncInstallmentPlans(userId, referenceMonth);
   const { months } = await recomputeMonthlySummaries(userId);
@@ -532,6 +543,7 @@ export async function processUserTransactions(userId: string) {
   const committed = await recomputeCommittedByMonth(userId, referenceMonth, plans);
   return {
     updated,
+    ai,
     months,
     installmentPlans: plans.length,
     recurrences: recurrencesFound,

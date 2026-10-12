@@ -254,10 +254,9 @@ protótipo do Figma.
   saíram depois, na Fase 3 (ver lá). Do seed, só o `weekly_plans` ainda está na conta do Bruno.
   Atenção: rodar `db:seed` de novo recria tudo isso.
 - Importar fatura em **PDF** — precisa de extração de texto + LLM pra estruturar em JSON
-  validado com zod (CONTEXTO.md §6.2), e o provedor de IA final ainda é decisão em aberto
-  (CONTEXTO.md §15.6). `POST /imports` já devolve `501` com uma mensagem clara pra esse caso.
-- Pipeline, passo 2.3 (LLM barato pro que as regras não pegam) — depende do provedor de IA
-  (CONTEXTO.md §15.6). Hoje ~70% das saídas reais ficam sem categoria ("Outros").
+  validado com zod (CONTEXTO.md §6.2). O provedor já está escolhido (Claude, 2026-10-12); falta
+  fazer. `POST /imports` já devolve `501` com uma mensagem clara pra esse caso.
+- Pipeline, passo 2.3 — feito na Fase 3 (ver "Categorização por IA" lá).
 - Pipeline, passos 5–8 e o resto do passo 9 — viraram Fase 3 (ver a seção dela abaixo).
 - Push (Expo Notifications + `push-dispatcher`, §9) e central de alertas (`GET /alerts`, §6.9) —
   os alertas de conexão já são gravados, mas só aparecem no contador do sino.
@@ -401,7 +400,25 @@ protótipo do Figma.
 - **Plano da semana: "Separar R$ X para a fatura" conclui sozinho** quando o banco informa o
   pagamento (a fatura some da lista a pagar). O item desta semana do Bruno já aparece concluído.
 - **Valores do Futuro obedecem ao olho** — os números da aba usavam `formatCents` cru.
-- **Editar parcelamento (§6.6, Figma 49:1137)** — lápis no detalhe do parcelamento abre o sheet
+- **Provedor de IA escolhido: Claude** (Bruno, 2026-10-12; resolve a §15.6 por ora — o teste com
+  50 perguntas em Claude/GPT/Gemini fica pra antes do lançamento). Conta no console da Anthropic
+  com crédito pré-pago e teto de gasto, chave `planor-dev` (90 dias) em `ANTHROPIC_API_KEY`. AI SDK
+  7 (`ai` + `@ai-sdk/anthropic`) em `apps/api`.
+- **Categorização por IA (§6.3, passo 2.3)** — `services/aiCategorization.ts`, chamado no
+  `process-transactions` depois das regras. Haiku 5.5 (`claude-haiku-5-5`), saída em JSON com a
+  categoria numa lista fechada (as do usuário + "Não sei"); pergunta por estabelecimento, em lotes
+  de 60, até 300 por rodada. Resposta guardada em `ai_merchant_categories` (migração
+  `0009_furry_nebula.sql`, já aplicada) — o mesmo estabelecimento nunca é perguntado de novo, e
+  compras novas dele usam a resposta guardada. Só aplica com confiança ≥ 0,6
+  (`AI_MIN_CONFIDENCE`); grava `category_source = 'ai'` e `confidence`. Regra do usuário ou
+  global que case depois passa por cima da IA; escolha manual nunca muda. Sem chave ou com erro do
+  provedor, não faz nada e tenta na próxima sincronização.
+  Privacidade (§10): só vai o nome do estabelecimento sem números (CPF/CNPJ/conta/código), o
+  valor típico e se foi crédito, débito ou Pix pra empresa — `isAiEligible`,
+  `looksLikePersonName` e `merchantNameForAi` em `packages/shared` (com teste). Pix/TED pra pessoa
+  e nome que parece de pessoa (quem vende na maquininha como pessoa física) não vão.
+  Na conta do Bruno (12/10): 211 estabelecimentos, ~22 mil tokens (< US$ 0,06), 38 s.
+ — lápis no detalhe do parcelamento abre o sheet
   `src/features/parcelas/EditarParcelamentoSheet.tsx`: nome, categoria e "Já quitei antecipado".
   `PATCH /future/installments/:id`; colunas novas `installment_plans.display_name` e
   `category_id` (migração `0008_regular_pet_avengers.sql`, já aplicada). O nome fica separado do

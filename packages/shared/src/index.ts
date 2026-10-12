@@ -10,6 +10,7 @@ export * from './calculations/dueUntilMonthEnd';
 export * from './calculations/weeklyPlan';
 export * from './pipeline/normalize';
 export * from './pipeline/categorize';
+export * from './pipeline/aiCategorize';
 export * from './pipeline/monthlySummary';
 export * from './pipeline/installments';
 export * from './pipeline/recurrences';
