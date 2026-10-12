@@ -8,8 +8,9 @@
 //     4 a 6 horas");
 //   - `consent-expiry-check` (diário, 9h): avisa consentimento vencendo e marca os vencidos;
 //   - `process-transactions`: pipeline do §6.3 (normaliza, categoriza, recalcula agregados);
-//   - `weekly-plan` (segunda, 6h): gera o plano da semana (§6.4).
-// O resto da tabela do §9 (alertas, push...) ainda não existe — ver PROGRESSO.md.
+//   - `weekly-plan` (segunda, 6h): gera o plano da semana (§6.4);
+//   - `detect-alerts` (diário, 8h, e no fim do `process-transactions`): alertas da central (§6.9).
+// O push (`push-dispatcher`) ainda não existe — ver PROGRESSO.md.
 import PgBoss from 'pg-boss';
 import { env } from '../env';
 
@@ -19,6 +20,7 @@ export const QUEUES = {
   consentExpiryCheck: 'consent-expiry-check',
   processTransactions: 'process-transactions',
   weeklyPlan: 'weekly-plan',
+  detectAlerts: 'detect-alerts',
 } as const;
 
 export type SyncConnectionJob = { userId: string; itemId: string };
@@ -60,12 +62,20 @@ export function getBoss(): Promise<PgBoss> {
     // Jobs agendados: `singleton` (um rodando por vez) — se uma rodada atrasar, a próxima não
     // sobrepõe. O cron do pg-boss é único no banco inteiro: mesmo com a API rodando em duas
     // máquinas (banco compartilhado, ver CONTRIBUTING.md), cada horário dispara uma vez só.
-    await boss.createQueue(QUEUES.syncAllConnections, { name: QUEUES.syncAllConnections, policy: 'singleton' });
-    await boss.createQueue(QUEUES.consentExpiryCheck, { name: QUEUES.consentExpiryCheck, policy: 'singleton' });
+    await boss.createQueue(QUEUES.syncAllConnections, {
+      name: QUEUES.syncAllConnections,
+      policy: 'singleton',
+    });
+    await boss.createQueue(QUEUES.consentExpiryCheck, {
+      name: QUEUES.consentExpiryCheck,
+      policy: 'singleton',
+    });
     await boss.schedule(QUEUES.syncAllConnections, '0 */6 * * *', {}, { tz: TZ });
     await boss.schedule(QUEUES.consentExpiryCheck, '0 9 * * *', {}, { tz: TZ });
     await boss.createQueue(QUEUES.weeklyPlan, { name: QUEUES.weeklyPlan, policy: 'singleton' });
     await boss.schedule(QUEUES.weeklyPlan, '0 6 * * 1', {}, { tz: TZ });
+    await boss.createQueue(QUEUES.detectAlerts, { name: QUEUES.detectAlerts, policy: 'singleton' });
+    await boss.schedule(QUEUES.detectAlerts, '0 8 * * *', {}, { tz: TZ });
     return boss;
   })().catch((err) => {
     bossPromise = null; // deixa tentar de novo na próxima chamada
@@ -74,7 +84,10 @@ export function getBoss(): Promise<PgBoss> {
   return bossPromise;
 }
 
-export async function enqueueSyncConnection(data: SyncConnectionJob, opts?: { startAfterSeconds?: number }) {
+export async function enqueueSyncConnection(
+  data: SyncConnectionJob,
+  opts?: { startAfterSeconds?: number },
+) {
   const boss = await getBoss();
   return boss.send(QUEUES.syncConnection, data, {
     singletonKey: `${data.userId}:${data.itemId}`,
@@ -84,7 +97,9 @@ export async function enqueueSyncConnection(data: SyncConnectionJob, opts?: { st
 
 export async function enqueueProcessTransactions(userId: string) {
   const boss = await getBoss();
-  return boss.send(QUEUES.processTransactions, { userId } satisfies ProcessTransactionsJob, { singletonKey: userId });
+  return boss.send(QUEUES.processTransactions, { userId } satisfies ProcessTransactionsJob, {
+    singletonKey: userId,
+  });
 }
 
 export async function stopBoss() {

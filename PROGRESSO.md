@@ -423,6 +423,21 @@ protótipo do Figma.
   compras) ficou em Lazer, confirmado pelo Bruno. No primeiro teste, antes do
   `looksLikePersonName`, ~13 nomes de pessoa que vendem na maquininha foram enviados uma vez; as
   respostas deles foram apagadas do cache e não são mais enviados.
+- **Central de alertas (§6.9, Figma 34:857)** — tela `app/alertas.tsx`, aberta pelo sino da Home
+  (que antes não fazia nada): grupos por dia (Hoje, Ontem, data), chips Todos / Não lidos /
+  Importantes, "Marcar todos como lidos" no topo; tocar marca como lido e abre o destino. Valores
+  no texto obedecem ao olho. `GET /alerts` e `POST /alerts/read` (eram stub; sem `ids` marca
+  todos). O texto de cada alerta sai de `describeAlert` em `packages/shared` (com teste). O
+  contador do sino só conta os tipos que a central mostra (`KNOWN_ALERT_TYPES`).
+- **Gasto fora do padrão (§6.3, passo 7) e outros alertas** — `services/detectAlerts.ts`, no fim
+  do `process-transactions` e no job novo `detect-alerts` (diário, 8h, §9). Gera:
+  `unusual_spend` de compra (> 1,5× a média por compra da categoria nos 3 meses anteriores) e de
+  categoria (variável acima de 80% do habitual antes do dia 20), `subscription_price_up` e
+  `statement_closing` (fatura fecha em até 3 dias, com a previsão e as parcelas). Regras puras
+  `unusualPurchases`/`categoriesAheadOfPace` (com teste). Simulado em datas passadas da conta do
+  Bruno: em 15/09 sairiam 3 compras fora do padrão (TikTok, Apple) e 3 categorias acima do ritmo.
+- **"Ontem" nunca aparecia** nos grupos por dia (Gastos · Transações): `dayGroupLabel` comparava a
+  data com o dia anterior a ela mesma. Corrigido.
 - **Editar parcelamento (§6.6, Figma 49:1137)** — lápis no detalhe do parcelamento abre o sheet
   `src/features/parcelas/EditarParcelamentoSheet.tsx`: nome, categoria e "Já quitei antecipado".
   `PATCH /future/installments/:id`; colunas novas `installment_plans.display_name` e
@@ -434,8 +449,13 @@ protótipo do Figma.
   conta do Bruno e desfeito: quitar o PagTesouro tirou R$ 29,12 de cada mês até abril.
 
 **Falta:**
-- Assinaturas: "cobrança duplicada" (§6.3, passo 5) ainda não é detectada — entra junto com os
-  alertas. Plano da semana: faltam os itens que dependem de metas e dos objetivos do onboarding.
+- Assinaturas: "cobrança duplicada" (§6.3, passo 5) ainda não é detectada.
+- Alertas: push (§9, `push-dispatcher`; precisa da conta paga de desenvolvedor da Apple) e
+  preferências por tipo/horário silencioso; tipos do §6.9 ainda não gerados (`charge_upcoming`,
+  `subscription_new`, `installment_new`, `limit_80`/`limit_exceeded`, `weekly_plan_ready`,
+  `monthly_recap_ready`, `household_*`, `social_*`, `trial_ending`). O ícone `cadeado` do
+  registry tem o desenho de uma estrela — conferir no Figma. Os 3 alertas fictícios do seed
+  foram apagados da conta do Bruno (2026-10-12, com o OK dele). Plano da semana: faltam os itens que dependem de metas e dos objetivos do onboarding.
 - Parcelas: o filtro do topo ("Filtrar compromissos", 49:1095). "Avisar antes da última parcela"
   (do sheet de editar) espera o push (§6.9).
 - Fixos: editar uma conta cadastrada à mão (hoje só remove). Fatura do cartão: trocar de mês
@@ -444,8 +464,7 @@ protótipo do Figma.
   "Uso pouco" esperam o push (§6.9) — sem ele, "Lembrete criado" seria mentira. O alerta de
   cobrança depois do cancelamento só aparece no contador do sino (a central de alertas ainda não
   existe).
-- Passos 6 e 7 (fixo/variável pela recorrência, gasto fora do padrão), central de alertas e push,
-  IA.
+- Passo 6 (fixo/variável pela recorrência), chat da IA (§6.7).
 - "Atualizar agora" leva ~1 min na conta do Bruno (1.135 transações): a sincronização grava uma
   transação por vez. Dá pra fazer em lote.
 
@@ -488,6 +507,16 @@ protótipo do Figma.
   aberta). A aberta continua calculada em `credit_cards.current_bill_cents`. O card do Futuro, o
   plano da semana e a tela da fatura mostram "a fatura a pagar": a fechada enquanto falta pagar
   (mesmo atrasada), depois a aberta.
+- **Limiares do gasto fora do padrão que o CONTEXTO não define** (§6.3, passo 7): compra só
+  vira alerta com pelo menos R$ 30 (R$ 12 numa categoria de média R$ 7 passa de 1,5×, mas é
+  ruído); média por compra só vale com 3+ compras na categoria; no máximo um alerta de compra
+  por categoria por rodada (o TikTok dava três no mesmo dia); só compras dos últimos 3 dias (a
+  primeira rodada não despeja o histórico); parcelas ficam de fora (compromisso já conhecido). O
+  ritmo da categoria só vale pra categorias variáveis com média de pelo menos R$ 100 (uma parcela
+  de R$ 46 sozinha já passava dos 80%). Os dois tipos usam `unusual_spend`, com `payload.kind`
+  `purchase` ou `category`.
+- **"Importantes" na central** = gasto fora do padrão, assinatura mais cara, cobrança depois do
+  cancelamento e problemas de conexão (o CONTEXTO lista o chip, mas não diz quais tipos).
 - **"Editar parcelamento" sem "Avisar antes da última parcela"** — sem push (§6.9) o aviso não
   chegaria; mesma decisão do "Me lembrar 3 dias antes" das assinaturas.
 - **Fatura do cartão tem seções além do Figma** — "Outras compras" (compras avulsas) e "Ainda não

@@ -2,7 +2,7 @@
 //
 // `dueUntilMonthEndCents` (parcelas + assinaturas + fixos que ainda vencem este mês) sai de
 // `services/dueThisMonth.ts`. `manual_recurring_bills` ("Nova conta fixa") ainda não tem tela.
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import {
   alerts,
   committedByMonth,
@@ -13,6 +13,7 @@ import {
   users,
 } from '@planor/db';
 import {
+  KNOWN_ALERT_TYPES,
   monthAbbrevPtBR,
   previousMonthKey,
   projectedLeftover,
@@ -111,7 +112,14 @@ export async function homeRoutes(app: FastifyInstance) {
     const [alertsCount] = await db
       .select({ value: sql<number>`count(*)::int` })
       .from(alerts)
-      .where(and(eq(alerts.userId, userId), isNull(alerts.readAt)));
+      // Só os tipos que a central mostra — senão o sino acende pra algo que não aparece lá.
+      .where(
+        and(
+          eq(alerts.userId, userId),
+          isNull(alerts.readAt),
+          inArray(alerts.type, [...KNOWN_ALERT_TYPES]),
+        ),
+      );
 
     const committedRows = await db
       .select()

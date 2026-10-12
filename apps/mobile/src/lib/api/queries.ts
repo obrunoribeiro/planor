@@ -7,6 +7,7 @@ import type {
   CategoryListItem,
   ConnectionListItem,
   FutureTimelineResponse,
+  AlertsResponse,
   CardStatementResponse,
   FixedBillsResponse,
   HomeResponse,
@@ -493,6 +494,33 @@ export function useSyncConnectionItemMutation() {
       void queryClient.invalidateQueries({ queryKey: ['connections'] });
       void queryClient.invalidateQueries({ queryKey: ['accounts'] });
       void queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    },
+  });
+}
+
+export function useAlertsQuery() {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['alerts'],
+    queryFn: () => apiFetch<AlertsResponse>('/alerts', { accessToken: accessToken! }),
+    enabled: !!accessToken,
+  });
+}
+
+/** Sem `ids`: "Marcar todos como lidos". */
+export function useMarkAlertsReadMutation() {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids?: string[]) =>
+      apiFetch<void>('/alerts/read', {
+        method: 'POST',
+        accessToken: accessToken!,
+        body: JSON.stringify(ids ? { ids } : {}),
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      void queryClient.invalidateQueries({ queryKey: ['home'] });
     },
   });
 }

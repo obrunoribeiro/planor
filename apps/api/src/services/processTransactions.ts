@@ -36,6 +36,7 @@ import {
 } from '@planor/shared';
 import { db } from '../lib/db';
 import { categorizeWithAi } from './aiCategorization';
+import { detectAlerts } from './detectAlerts';
 
 type TransactionPatch = {
   id: string;
@@ -541,9 +542,15 @@ export async function processUserTransactions(userId: string) {
   const { months } = await recomputeMonthlySummaries(userId);
   const { recurrences: recurrencesFound } = await syncRecurrences(userId, now);
   const committed = await recomputeCommittedByMonth(userId, referenceMonth, plans);
+  // Alertas (§9: "após o processamento"). Falha aqui não desfaz o resto.
+  const alertsResult = await detectAlerts(userId, now).catch((err: unknown) => ({
+    created: 0,
+    error: String(err),
+  }));
   return {
     updated,
     ai,
+    alerts: alertsResult.created,
     months,
     installmentPlans: plans.length,
     recurrences: recurrencesFound,

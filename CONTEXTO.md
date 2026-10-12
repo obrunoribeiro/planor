@@ -799,7 +799,7 @@ POST /future/bills · DELETE /future/bills/:id   # "Nova conta fixa" cadastrada 
 PATCH /future/installments/:id (name, categoryId, settledEarly)   # "Editar parcelamento"
 PATCH /subscriptions/:id (usage, cancelled, reminder)
 GET/POST/PATCH /goals · POST /goals/:id/contributions
-GET  /alerts · POST /alerts/read
+GET  /alerts · POST /alerts/read { ids? }   # sem ids: marcar todos como lidos
 POST /ai/chat (stream SSE) · GET /ai/conversations
 GET/POST /households · invites · /households/:id/dashboard · /settlements
 GET/POST /friends · /feed · /posts/:id/reactions|comments · /challenges · /split-expenses

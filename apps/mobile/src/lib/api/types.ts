@@ -340,3 +340,19 @@ export type TransactionListFilters = {
   minCents?: number;
   maxCents?: number;
 };
+
+/** `GET /alerts` — central de alertas (§6.9). Texto, ícone e destino já vêm prontos da API. */
+export type AlertItem = {
+  id: string;
+  type: string;
+  createdAt: string;
+  read: boolean;
+  title: string;
+  body: string;
+  tone: 'brand' | 'alert' | 'error' | 'success';
+  icon: string;
+  route: string | null;
+  important: boolean;
+};
+
+export type AlertsResponse = { unreadCount: number; items: AlertItem[] };
