@@ -417,7 +417,12 @@ protótipo do Figma.
   valor típico e se foi crédito, débito ou Pix pra empresa — `isAiEligible`,
   `looksLikePersonName` e `merchantNameForAi` em `packages/shared` (com teste). Pix/TED pra pessoa
   e nome que parece de pessoa (quem vende na maquininha como pessoa física) não vão.
-  Na conta do Bruno (12/10): 211 estabelecimentos, ~22 mil tokens (< US$ 0,06), 38 s.
+  Na conta do Bruno (12/10): 211 estabelecimentos, ~22 mil tokens (< US$ 0,06), 38 s. Aplicado com
+  o OK dele: 456 compras categorizadas pela IA; sem categoria caiu de 688 (68%) pra 232 (23%) —
+  184 em que a IA não teve certeza e 48 que não podem ir (Pix/nome de pessoa). TikTok (149
+  compras) ficou em Lazer, confirmado pelo Bruno. No primeiro teste, antes do
+  `looksLikePersonName`, ~13 nomes de pessoa que vendem na maquininha foram enviados uma vez; as
+  respostas deles foram apagadas do cache e não são mais enviados.
  — lápis no detalhe do parcelamento abre o sheet
   `src/features/parcelas/EditarParcelamentoSheet.tsx`: nome, categoria e "Já quitei antecipado".
   `PATCH /future/installments/:id`; colunas novas `installment_plans.display_name` e
