@@ -136,6 +136,26 @@ export type SubscriptionsResponse = {
   items: SubscriptionItem[];
 };
 
+export type FixedBillItem = {
+  id: string;
+  /** Detectado nas transações, ou cadastrado à mão em "Nova conta fixa" (só esse dá pra remover). */
+  source: 'detected' | 'manual';
+  name: string;
+  amountCents: number;
+  /** Dia do mês em que cobra. */
+  day: number | null;
+  paidWith: string | null;
+  /** Valor pela média das 3 últimas (conta que varia, como energia). */
+  estimated: boolean;
+};
+
+export type FixedBillsResponse = {
+  /** "YYYY-MM". */
+  nextMonth: string;
+  monthlyCents: number;
+  items: FixedBillItem[];
+};
+
 export type FutureTimelineResponse = {
   committed: { untilLabel: string | null; totalCents: number; months: { label: string; amountCents: number; active: boolean }[] };
   currentMonth: {

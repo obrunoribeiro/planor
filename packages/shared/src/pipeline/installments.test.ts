@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { projectCommittedByMonth } from '../calculations/committedByMonth';
+import { manualBillAsRecurrence, projectCommittedByMonth } from '../calculations/committedByMonth';
 import { addMonthsToKey, detectInstallmentPlans, installmentPlanProgress, monthsBetweenKeys, parseInstallmentSuffix, type InstallmentTransaction } from './installments';
 
 describe('parseInstallmentSuffix', () => {
@@ -186,5 +186,20 @@ describe('installmentPlanProgress', () => {
       nextDue: null,
     });
     expect(installmentPlanProgress({ installmentCents: 2912, totalCents: 34_944, count: 12, current: 6 }, '2026-12', null).nextDue).toBe('2027-01');
+  });
+});
+
+describe('manualBillAsRecurrence', () => {
+  it('próxima cobrança no dia da conta; dia que já passou vai pro mês seguinte', () => {
+    expect(manualBillAsRecurrence({ amountCents: 5990, day: 20 }, '2026-10-12').nextChargeAt!.toISOString().slice(0, 10)).toBe('2026-10-20');
+    expect(manualBillAsRecurrence({ amountCents: 5990, day: 10 }, '2026-10-12').nextChargeAt!.toISOString().slice(0, 10)).toBe('2026-11-10');
+    expect(manualBillAsRecurrence({ amountCents: 5990, day: 5 }, '2026-12-20').nextChargeAt!.toISOString().slice(0, 10)).toBe('2027-01-05');
+  });
+
+  it('dia 31 vira o último dia do mês e entra todo mês no comprometido', () => {
+    const bill = manualBillAsRecurrence({ amountCents: 65_000, day: 31 }, '2026-11-02');
+    expect(bill.nextChargeAt!.toISOString().slice(0, 10)).toBe('2026-11-30');
+    const months = projectCommittedByMonth({ referenceMonth: '2026-11', horizon: 3, installments: [], recurrences: [bill] });
+    expect(months.map((m) => m.billsCents)).toEqual([65_000, 65_000, 65_000]);
   });
 });

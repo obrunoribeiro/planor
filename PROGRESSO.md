@@ -357,6 +357,16 @@ protótipo do Figma.
   Plano da semana ganhou o item "Marcar assinaturas sem uso" (`subscription_usage`: assinaturas
   ativas sem o uso marcado, leva pra Assinaturas, conclui sozinho quando todas forem marcadas).
   Entra a partir do próximo plano (segunda), porque o desta semana já foi gerado.
+- **Tela de Fixos recorrentes e "Nova conta fixa" (§6.6, Figma 48:1034 e 48:1111)** —
+  `apps/mobile/app/futuro/fixos.tsx` (resumo do próximo mês, lista com "pago com · todo dia DD",
+  selo "estimado" e aviso de conta que varia) e `src/features/fixos/NovaContaFixaSheet.tsx`
+  (nome, valor, dia, pago com). Junta os fixos detectados (`recurrences`) com os cadastrados à
+  mão (`manual_recurring_bills`, tabela que já existia). Rotas `GET /future/bills` (era stub),
+  `POST /future/bills` e `DELETE /future/bills/:id` (CONTEXTO §8 atualizado). Conta cadastrada à
+  mão entra no comprometido e no "a vencer" pelas mesmas regras (`manualBillAsRecurrence` em
+  `packages/shared`, com teste). Tocar numa conta cadastrada à mão oferece remover. Testado com a
+  conta do Bruno: uma conta de teste de R$ 100,00 entrou no comprometido de novembro e no "a
+  vencer" de outubro, e saiu ao remover.
 - **Rótulos das barras do "Já comprometido" na Home** mostravam reais ÷ 10 ("234" pra R$ 2.340);
   agora reais inteiros, como no Figma (25:197). Também corrigidas chaves React repetidas no card
   de parcelas/assinaturas da Home ("3/3" aparecia duas vezes).
@@ -377,7 +387,8 @@ protótipo do Figma.
 - Parcelas: "Editar parcelamento" (Figma 49:1137 — nome, categoria, aviso antes da última,
   "Já quitei antecipado") e o filtro do topo ("Filtrar compromissos", 49:1095). Os valores das
   linhas do bloco do mês no Futuro ainda usam `formatCents` e não obedecem ao olho.
-- Tela de Fixos recorrentes e "Nova conta fixa" (§6.6) — próximo PR.
+- Fixos: editar uma conta cadastrada à mão (hoje só remove). Fatura do cartão (Figma 48:1147,
+  `/future/statements/:id`) ainda é stub.
 - Assinaturas: "Me lembrar 3 dias antes da cobrança" (Figma 49:1269) e o lembrete de 30 dias do
   "Uso pouco" esperam o push (§6.9) — sem ele, "Lembrete criado" seria mentira. O alerta de
   cobrança depois do cancelamento só aparece no contador do sino (a central de alertas ainda não
@@ -414,6 +425,10 @@ protótipo do Figma.
   R$ 31,90 de jan/fev). O passo a passo "Como cancelar" é genérico (o Figma também é); não há
   instrução por serviço. Data prevista que passou sem cobrança aparece como "não cobrou em
   27/09" / "Atrasada", não "renova".
+- **Fixos: um ícone só (repetir) pra todas as contas** — o Figma usa um ícone por tipo
+  (casa, cartão, calendário…), mas o app não sabe o tipo de uma conta detectada ou digitada.
+  "Pago com" de uma conta detectada é o banco da última cobrança. Conta cadastrada à mão com dia
+  que já passou no mês conta como paga (o app não tem como saber).
 - **Comprometido não inclui o mês corrente** — começa no mês seguinte (o mês corrente é "a vencer",
   outro número do §2). Recorrência mensal (até 35 dias) cobra uma vez por mês a partir do mês da
   próxima cobrança — somar o intervalo em dias faria um mês "pular" de vez em quando;

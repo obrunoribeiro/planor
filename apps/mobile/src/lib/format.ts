@@ -104,3 +104,11 @@ export function institutionInitials(name: string): string {
   const brand = name.trim().replace(/^banco\s+/i, '');
   return (brand || name).slice(0, 2).toUpperCase();
 }
+
+/** Valor digitado em reais: "6.500,00" ou "6500,5" → 6500.5. `null` se não for um número válido. */
+export function parseReaisInput(text: string): number | null {
+  const normalized = text.replace(/R\$/g, '').replace(/\./g, '').replace(',', '.').trim();
+  if (!normalized) return null;
+  const value = Number(normalized);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}

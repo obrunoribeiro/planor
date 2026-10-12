@@ -7,6 +7,7 @@ import type {
   CategoryListItem,
   ConnectionListItem,
   FutureTimelineResponse,
+  FixedBillsResponse,
   HomeResponse,
   InstallmentsResponse,
   LeftoverForecastResponse,
@@ -101,6 +102,41 @@ export function useUpdateSubscriptionMutation(id: string) {
         void queryClient.invalidateQueries({ queryKey: [key] });
       }
     },
+  });
+}
+
+export function useFixedBillsQuery() {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['fixed-bills'],
+    queryFn: () => apiFetch<FixedBillsResponse>('/future/bills', { accessToken: accessToken! }),
+    enabled: !!accessToken,
+  });
+}
+
+/** Conta fixa muda o comprometido e o "a vencer" (recalculados no job) — relê o que depende disso. */
+function invalidateAfterBillChange(queryClient: ReturnType<typeof useQueryClient>) {
+  for (const key of ['fixed-bills', 'home', 'future-timeline', 'leftover-forecast']) {
+    void queryClient.invalidateQueries({ queryKey: [key] });
+  }
+}
+
+export function useCreateFixedBillMutation() {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (bill: { name: string; amountCents: number; day: number; paidWith: string | null }) =>
+      apiFetch<{ id: string }>('/future/bills', { method: 'POST', accessToken: accessToken!, body: JSON.stringify(bill) }),
+    onSuccess: () => invalidateAfterBillChange(queryClient),
+  });
+}
+
+export function useDeleteFixedBillMutation() {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<void>(`/future/bills/${id}`, { method: 'DELETE', accessToken: accessToken! }),
+    onSuccess: () => invalidateAfterBillChange(queryClient),
   });
 }
 

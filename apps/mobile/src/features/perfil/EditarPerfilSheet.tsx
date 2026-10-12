@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useUpdateMeMutation } from '@/lib/api/queries';
 import type { MeResponse } from '@/lib/api/types';
+import { parseReaisInput } from '@/lib/format';
 
 export type EditarPerfilSheetProps = {
   visible: boolean;
@@ -18,13 +19,6 @@ function centsToReaisInput(cents: number | null): string {
   return (cents / 100).toFixed(2).replace('.', ',');
 }
 
-/** "6.500,00" ou "6500,5" → 6500.5. `null` se não for um número válido. */
-function parseReaisInput(text: string): number | null {
-  const normalized = text.replace(/\./g, '').replace(',', '.').trim();
-  if (!normalized) return null;
-  const value = Number(normalized);
-  return Number.isFinite(value) && value >= 0 ? value : null;
-}
 
 export function EditarPerfilSheet({ visible, onClose, me }: EditarPerfilSheetProps) {
   const [name, setName] = useState(me.name ?? '');
