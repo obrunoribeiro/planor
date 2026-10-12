@@ -401,12 +401,21 @@ protótipo do Figma.
 - **Plano da semana: "Separar R$ X para a fatura" conclui sozinho** quando o banco informa o
   pagamento (a fatura some da lista a pagar). O item desta semana do Bruno já aparece concluído.
 - **Valores do Futuro obedecem ao olho** — os números da aba usavam `formatCents` cru.
+- **Editar parcelamento (§6.6, Figma 49:1137)** — lápis no detalhe do parcelamento abre o sheet
+  `src/features/parcelas/EditarParcelamentoSheet.tsx`: nome, categoria e "Já quitei antecipado".
+  `PATCH /future/installments/:id`; colunas novas `installment_plans.display_name` e
+  `category_id` (migração `0008_regular_pet_avengers.sql`, já aplicada). O nome fica separado do
+  detectado (`merchant_name` é a chave que casa o parcelamento entre sincronizações). A categoria
+  vai pra todas as parcelas, inclusive as que chegarem depois (o pipeline agora roda os
+  parcelamentos antes dos resumos do mês). Quitado sai do comprometido, do "a vencer", da Home e
+  dos totais de Parcelas, e fica no fim da lista como "quitado" (dá pra desfazer). Validado na
+  conta do Bruno e desfeito: quitar o PagTesouro tirou R$ 29,12 de cada mês até abril.
 
 **Falta:**
 - Assinaturas: "cobrança duplicada" (§6.3, passo 5) ainda não é detectada — entra junto com os
   alertas. Plano da semana: faltam os itens que dependem de metas e dos objetivos do onboarding.
-- Parcelas: "Editar parcelamento" (Figma 49:1137 — nome, categoria, aviso antes da última,
-  "Já quitei antecipado") e o filtro do topo ("Filtrar compromissos", 49:1095).
+- Parcelas: o filtro do topo ("Filtrar compromissos", 49:1095). "Avisar antes da última parcela"
+  (do sheet de editar) espera o push (§6.9).
 - Fixos: editar uma conta cadastrada à mão (hoje só remove). Fatura do cartão: trocar de mês
   (a rota já aceita `?month=`, a tela ainda não tem seletor).
 - Assinaturas: "Me lembrar 3 dias antes da cobrança" (Figma 49:1269) e o lembrete de 30 dias do
@@ -457,6 +466,8 @@ protótipo do Figma.
   aberta). A aberta continua calculada em `credit_cards.current_bill_cents`. O card do Futuro, o
   plano da semana e a tela da fatura mostram "a fatura a pagar": a fechada enquanto falta pagar
   (mesmo atrasada), depois a aberta.
+- **"Editar parcelamento" sem "Avisar antes da última parcela"** — sem push (§6.9) o aviso não
+  chegaria; mesma decisão do "Me lembrar 3 dias antes" das assinaturas.
 - **Fatura do cartão tem seções além do Figma** — "Outras compras" (compras avulsas) e "Ainda não
   detalhado" (o que o banco cobrou e não mandou uma a uma). O Figma (48:1147) é de uma fatura
   futura, só com parcelas, assinaturas e fixos; numa fatura real, sem essas duas linhas a soma

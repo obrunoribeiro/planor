@@ -57,6 +57,13 @@
       "when": 1791846606094,
       "tag": "0007_clever_randall",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791847049934,
+      "tag": "0008_regular_pet_avengers",
+      "breakpoints": true
     }
   ]
 }

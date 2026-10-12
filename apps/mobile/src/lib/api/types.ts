@@ -35,9 +35,17 @@ export type HomeResponse = {
     undetailedCents: number;
     projectedLeftoverCents: number;
   };
-  committed: { nextMonthLabel: string; nextMonthAmountCents: number; months: { label: string; amountCents: number }[] } | null;
+  committed: {
+    nextMonthLabel: string;
+    nextMonthAmountCents: number;
+    months: { label: string; amountCents: number }[];
+  } | null;
   weeklyPlan: { label: string; doneCount: number; totalCount: number; items: WeeklyPlanItem[] };
-  spendingThisMonth: { amountCents: number; trendVsLastMonthPct: number | null; sparkline: number[] };
+  spendingThisMonth: {
+    amountCents: number;
+    trendVsLastMonthPct: number | null;
+    sparkline: number[];
+  };
   subscriptions: {
     count: number;
     monthlyCents: number;
@@ -45,7 +53,12 @@ export type HomeResponse = {
     unusedCount: number;
     avatars: { initials: string; colorToken: 'purple800' | 'alert800' }[];
   };
-  installments: { count: number; monthlyCents: number; lastInstallmentDate: string | null; progress: { label: string; percent: number }[] };
+  installments: {
+    count: number;
+    monthlyCents: number;
+    lastInstallmentDate: string | null;
+    progress: { label: string; percent: number }[];
+  };
   fixedVsVariable: { fixedCents: number; variableCents: number; fixedPct: number };
   /** Mês da retrospectiva mais recente (ex.: "setembro"), ou `null` quando ainda não existe uma
    * gerada (job `monthly-recap`, Fase 5 — CONTEXTO.md §13) — hoje é sempre `null`. */
@@ -82,13 +95,24 @@ export type LeftoverForecastResponse = {
   /** Já inclui `undetailedCents`. */
   spentThisMonthCents: number;
   undetailedCents: number;
-  due: { installmentsCents: number; subscriptionsCents: number; billsCents: number; otherCents: number; totalCents: number };
+  due: {
+    installmentsCents: number;
+    subscriptionsCents: number;
+    billsCents: number;
+    otherCents: number;
+    totalCents: number;
+  };
   projectedLeftoverCents: number;
 };
 
 export type InstallmentPlanItem = {
   id: string;
+  /** O nome escolhido em "Editar parcelamento", ou o detectado. */
   merchantName: string;
+  detectedName: string;
+  categoryId: string | null;
+  /** "Já quitei antecipado": fica no fim da lista e fora dos totais. */
+  settledEarly: boolean;
   bank: string;
   installmentCents: number;
   totalCents: number;
@@ -157,7 +181,11 @@ export type FixedBillsResponse = {
 };
 
 export type FutureTimelineResponse = {
-  committed: { untilLabel: string | null; totalCents: number; months: { label: string; amountCents: number; active: boolean }[] };
+  committed: {
+    untilLabel: string | null;
+    totalCents: number;
+    months: { label: string; amountCents: number; active: boolean }[];
+  };
   currentMonth: {
     label: string;
     totalCents: number;
@@ -181,7 +209,10 @@ export type CardStatementResponse = {
   /** "YYYY-MM-DD". */
   closingDate: string;
   dueDate: string;
-  installments: { totalCents: number; items: { name: string; number: number | null; count: number | null; amountCents: number }[] };
+  installments: {
+    totalCents: number;
+    items: { name: string; number: number | null; count: number | null; amountCents: number }[];
+  };
   subscriptions: { totalCents: number; count: number; unusedCount: number };
   bills: { totalCents: number; items: { name: string; amountCents: number }[] };
   otherPurchases: { totalCents: number; count: number };

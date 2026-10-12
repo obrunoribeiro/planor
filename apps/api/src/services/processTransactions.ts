@@ -7,7 +7,18 @@
 // fixos recorrentes) e passo 9 (`monthly_summaries` e `committed_by_month`). Ficam pra depois:
 // fixo/variável pela recorrência (6), fora do padrão (7) e plano da semana (9) — ver PROGRESSO.md.
 import { and, eq, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
-import { accounts, alerts, categories, categoryRules, committedByMonth, installmentPlans, manualRecurringBills, monthlySummaries, recurrences, transactions } from '@planor/db';
+import {
+  accounts,
+  alerts,
+  categories,
+  categoryRules,
+  committedByMonth,
+  installmentPlans,
+  manualRecurringBills,
+  monthlySummaries,
+  recurrences,
+  transactions,
+} from '@planor/db';
 import {
   buildMonthlySummaries,
   categorizeTransaction,
@@ -90,17 +101,28 @@ async function normalizeAndCategorize(userId: string): Promise<{ updated: number
 
   // Categoria global do dicionário → id. Se o usuário tiver uma com o mesmo nome, a global vence
   // (o dicionário fala das categorias padrão do §6.3, passo 3).
-  const globalIdByName = new Map(categoryRows.filter((c) => c.userId === null).map((c) => [c.name, c.id]));
+  const globalIdByName = new Map(
+    categoryRows.filter((c) => c.userId === null).map((c) => [c.name, c.id]),
+  );
   const kindById = new Map(categoryRows.map((c) => [c.id, c.defaultKind]));
-  const ruleInputs = rules.map((r) => ({ matchType: r.matchType, pattern: r.pattern, categoryId: r.categoryId, expenseKind: r.expenseKind }));
+  const ruleInputs = rules.map((r) => ({
+    matchType: r.matchType,
+    pattern: r.pattern,
+    categoryId: r.categoryId,
+    expenseKind: r.expenseKind,
+  }));
 
   const patches: TransactionPatch[] = [];
   for (const row of rows) {
     // Seed e importações antigas já trazem um nome "bonito" escolhido à mão (ex.: "Pizzaria
     // Bella Massa") — só recalcula quando o nome atual ainda é a própria descrição crua.
     const merchantName =
-      !row.merchantName || row.merchantName === row.descriptionRaw ? normalizeMerchantName(row.descriptionRaw) : row.merchantName;
-    const isTransfer = row.isTransfer || isCardBillPayment({ descriptionRaw: row.descriptionRaw, accountType: row.accountType });
+      !row.merchantName || row.merchantName === row.descriptionRaw
+        ? normalizeMerchantName(row.descriptionRaw)
+        : row.merchantName;
+    const isTransfer =
+      row.isTransfer ||
+      isCardBillPayment({ descriptionRaw: row.descriptionRaw, accountType: row.accountType });
 
     let categoryId = row.categoryId;
     let categorySource = row.categorySource;
@@ -108,12 +130,18 @@ async function normalizeAndCategorize(userId: string): Promise<{ updated: number
 
     const userOwnsCategory = categorySource === 'manual' || categorySource === 'ai';
     if (!userOwnsCategory && !isTransfer) {
-      const result = categorizeTransaction({ descriptionRaw: row.descriptionRaw, merchantName, amountCents: row.amountCents }, ruleInputs);
-      const resolvedId = result?.categoryId ?? (result?.categoryName ? globalIdByName.get(result.categoryName) : undefined);
+      const result = categorizeTransaction(
+        { descriptionRaw: row.descriptionRaw, merchantName, amountCents: row.amountCents },
+        ruleInputs,
+      );
+      const resolvedId =
+        result?.categoryId ??
+        (result?.categoryName ? globalIdByName.get(result.categoryName) : undefined);
       if (result && resolvedId) {
         categoryId = resolvedId;
         categorySource = result.source;
-        expenseKind ??= result.expenseKind ?? (row.amountCents < 0 ? (kindById.get(resolvedId) ?? null) : null);
+        expenseKind ??=
+          result.expenseKind ?? (row.amountCents < 0 ? (kindById.get(resolvedId) ?? null) : null);
       } else if (categorySource === 'user_rule' || categorySource === 'global_rule') {
         // A regra que tinha categorizado não existe mais (ex.: usuário apagou) — volta pra sem categoria.
         categoryId = null;
@@ -186,14 +214,24 @@ async function recomputeMonthlySummaries(userId: string): Promise<{ months: numb
 const COMMITTED_HORIZON_MONTHS = 6; // o Futuro mostra os próximos 6 meses (§6.6)
 
 /** Mesma identidade que o passo 4 usa pra agrupar parcelas (sem o valor, que varia 1 centavo). */
-function planKey(plan: { accountId: string; merchantName: string; count: number; firstMonth: string }) {
-  return [plan.accountId, normalizeForMatch(plan.merchantName), plan.count, plan.firstMonth].join('|');
+function planKey(plan: {
+  accountId: string;
+  merchantName: string;
+  count: number;
+  firstMonth: string;
+}) {
+  return [plan.accountId, normalizeForMatch(plan.merchantName), plan.count, plan.firstMonth].join(
+    '|',
+  );
 }
 
 /** Passo 4 — parcelamentos ativos. Atualiza no lugar os que já existiam (mantém o id e o que o
  * usuário marcou, como "já quitei antecipado"), cria os novos, apaga os que terminaram ou não
  * aparecem mais, e liga cada parcela (transação) ao seu parcelamento. */
-async function syncInstallmentPlans(userId: string, referenceMonth: string): Promise<DetectedInstallmentPlan[]> {
+async function syncInstallmentPlans(
+  userId: string,
+  referenceMonth: string,
+): Promise<DetectedInstallmentPlan[]> {
   const rows = await db
     .select({
       id: transactions.id,
@@ -207,20 +245,38 @@ async function syncInstallmentPlans(userId: string, referenceMonth: string): Pro
       billMonth: transactions.billMonth,
     })
     .from(transactions)
-    .where(and(eq(transactions.userId, userId), eq(transactions.isHidden, false), eq(transactions.isTransfer, false)));
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        eq(transactions.isHidden, false),
+        eq(transactions.isTransfer, false),
+      ),
+    );
 
   const detected = detectInstallmentPlans(rows, referenceMonth);
+  // Os quitados antecipadamente ("Já quitei antecipado", §6.6) continuam ligados às parcelas, mas
+  // não entram no comprometido.
+  const active: DetectedInstallmentPlan[] = [];
 
   await db.transaction(async (tx) => {
-    const existing = await tx.select().from(installmentPlans).where(eq(installmentPlans.userId, userId));
+    const existing = await tx
+      .select()
+      .from(installmentPlans)
+      .where(eq(installmentPlans.userId, userId));
     const existingByKey = new Map(
       existing.map((p) => [
-        planKey({ accountId: p.accountId, merchantName: p.merchantName, count: p.count, firstMonth: p.firstDate.slice(0, 7) }),
+        planKey({
+          accountId: p.accountId,
+          merchantName: p.merchantName,
+          count: p.count,
+          firstMonth: p.firstDate.slice(0, 7),
+        }),
         p,
       ]),
     );
 
     const keptIds = new Set<string>();
+    const settledIds = new Set(existing.filter((p) => p.settledEarly).map((p) => p.id));
     const links: { transactionId: string; planId: string }[] = [];
     for (const plan of detected) {
       const values = {
@@ -239,12 +295,18 @@ async function syncInstallmentPlans(userId: string, referenceMonth: string): Pro
         ? (
             await tx
               .update(installmentPlans)
-              .set({ current: values.current, installmentCents: values.installmentCents, totalCents: values.totalCents, lastDate: values.lastDate })
+              .set({
+                current: values.current,
+                installmentCents: values.installmentCents,
+                totalCents: values.totalCents,
+                lastDate: values.lastDate,
+              })
               .where(eq(installmentPlans.id, match.id))
               .returning()
           )[0]!.id
         : (await tx.insert(installmentPlans).values(values).returning())[0]!.id;
       keptIds.add(planId);
+      if (!settledIds.has(planId)) active.push(plan);
       for (const transactionId of plan.transactionIds) links.push({ transactionId, planId });
     }
 
@@ -255,7 +317,9 @@ async function syncInstallmentPlans(userId: string, referenceMonth: string): Pro
       .where(and(eq(transactions.userId, userId), isNotNull(transactions.installmentPlanId)));
     for (let i = 0; i < links.length; i += UPDATE_CHUNK) {
       const values = sql.join(
-        links.slice(i, i + UPDATE_CHUNK).map((l) => sql`(${l.transactionId}::uuid, ${l.planId}::uuid)`),
+        links
+          .slice(i, i + UPDATE_CHUNK)
+          .map((l) => sql`(${l.transactionId}::uuid, ${l.planId}::uuid)`),
         sql`, `,
       );
       await tx.execute(sql`
@@ -265,11 +329,20 @@ async function syncInstallmentPlans(userId: string, referenceMonth: string): Pro
       `);
     }
 
+    // Categoria escolhida em "Editar parcelamento" vale também pras parcelas que chegaram agora.
+    await tx.execute(sql`
+      update transactions as t set category_id = p.category_id, category_source = 'manual'
+      from installment_plans as p
+      where t.installment_plan_id = p.id and p.user_id = ${userId} and p.category_id is not null
+        and t.category_id is distinct from p.category_id
+    `);
+
     const staleIds = existing.filter((p) => !keptIds.has(p.id)).map((p) => p.id);
-    if (staleIds.length > 0) await tx.delete(installmentPlans).where(inArray(installmentPlans.id, staleIds));
+    if (staleIds.length > 0)
+      await tx.delete(installmentPlans).where(inArray(installmentPlans.id, staleIds));
   });
 
-  return detected;
+  return active;
 }
 
 /** Passo 5 — assinaturas e fixos recorrentes. Como nos parcelamentos: atualiza no lugar o que já
@@ -330,11 +403,18 @@ async function syncRecurrences(userId: string, now: Date): Promise<{ recurrences
         // Status: "Já cancelei" continua cancelado; o que tinha terminado volta a ficar ativo.
         await tx
           .update(recurrences)
-          .set({ ...values, status: match.status === 'cancelled_by_user' ? match.status : 'active' })
+          .set({
+            ...values,
+            status: match.status === 'cancelled_by_user' ? match.status : 'active',
+          })
           .where(eq(recurrences.id, match.id));
         // §6.6: "Já cancelei" tira da previsão e confirma se a cobrança voltar — cobrança depois
         // do cancelamento vira alerta (uma vez por cobrança).
-        if (match.status === 'cancelled_by_user' && match.cancelledAt && found.lastChargeAt > match.cancelledAt) {
+        if (
+          match.status === 'cancelled_by_user' &&
+          match.cancelledAt &&
+          found.lastChargeAt > match.cancelledAt
+        ) {
           const chargedAt = found.lastChargeAt.toISOString();
           const [already] = await tx
             .select({ id: alerts.id })
@@ -351,12 +431,22 @@ async function syncRecurrences(userId: string, now: Date): Promise<{ recurrences
             await tx.insert(alerts).values({
               userId,
               type: 'subscription_charged_after_cancel',
-              payload: { recurrenceId: match.id, merchantName: found.merchantName, amountCents: found.amountCents, chargedAt },
+              payload: {
+                recurrenceId: match.id,
+                merchantName: found.merchantName,
+                amountCents: found.amountCents,
+                chargedAt,
+              },
             });
           }
         }
       } else {
-        recurrenceId = (await tx.insert(recurrences).values({ userId, kind: found.kind, ...values }).returning())[0]!.id;
+        recurrenceId = (
+          await tx
+            .insert(recurrences)
+            .values({ userId, kind: found.kind, ...values })
+            .returning()
+        )[0]!.id;
       }
       for (const transactionId of found.transactionIds) links.push({ transactionId, recurrenceId });
     }
@@ -367,7 +457,9 @@ async function syncRecurrences(userId: string, now: Date): Promise<{ recurrences
       .where(and(eq(transactions.userId, userId), isNotNull(transactions.recurrenceId)));
     for (let i = 0; i < links.length; i += UPDATE_CHUNK) {
       const values = sql.join(
-        links.slice(i, i + UPDATE_CHUNK).map((l) => sql`(${l.transactionId}::uuid, ${l.recurrenceId}::uuid)`),
+        links
+          .slice(i, i + UPDATE_CHUNK)
+          .map((l) => sql`(${l.transactionId}::uuid, ${l.recurrenceId}::uuid)`),
         sql`, `,
       );
       await tx.execute(sql`
@@ -377,7 +469,9 @@ async function syncRecurrences(userId: string, now: Date): Promise<{ recurrences
       `);
     }
 
-    const staleIds = existing.filter((r) => unmatched.has(r.id) && r.status !== 'cancelled_by_user').map((r) => r.id);
+    const staleIds = existing
+      .filter((r) => unmatched.has(r.id) && r.status !== 'cancelled_by_user')
+      .map((r) => r.id);
     if (staleIds.length > 0) await tx.delete(recurrences).where(inArray(recurrences.id, staleIds));
   });
 
@@ -385,28 +479,43 @@ async function syncRecurrences(userId: string, now: Date): Promise<{ recurrences
 }
 
 /** Passo 9 — `committed_by_month` dos próximos meses: parcelas detectadas + recorrências ativas. */
-async function recomputeCommittedByMonth(userId: string, referenceMonth: string, plans: DetectedInstallmentPlan[]): Promise<{ months: number }> {
+async function recomputeCommittedByMonth(
+  userId: string,
+  referenceMonth: string,
+  plans: DetectedInstallmentPlan[],
+): Promise<{ months: number }> {
   const activeRecurrences = await db
-    .select({ kind: recurrences.kind, amountCents: recurrences.amountCents, cadenceDays: recurrences.cadenceDays, nextChargeAt: recurrences.nextChargeAt })
+    .select({
+      kind: recurrences.kind,
+      amountCents: recurrences.amountCents,
+      cadenceDays: recurrences.cadenceDays,
+      nextChargeAt: recurrences.nextChargeAt,
+    })
     .from(recurrences)
     .where(and(eq(recurrences.userId, userId), eq(recurrences.status, 'active')));
   const manualBills = await db
     .select({ amountCents: manualRecurringBills.amountCents, day: manualRecurringBills.day })
     .from(manualRecurringBills)
     .where(eq(manualRecurringBills.userId, userId));
-  const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+  const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(
+    new Date(),
+  );
 
   const months = projectCommittedByMonth({
     referenceMonth,
     horizon: COMMITTED_HORIZON_MONTHS,
     installments: plans,
     // "Nova conta fixa" cadastrada à mão entra igual a um fixo recorrente detectado.
-    recurrences: [...activeRecurrences, ...manualBills.map((bill) => manualBillAsRecurrence(bill, todayKey))],
+    recurrences: [
+      ...activeRecurrences,
+      ...manualBills.map((bill) => manualBillAsRecurrence(bill, todayKey)),
+    ],
   });
 
   await db.transaction(async (tx) => {
     await tx.delete(committedByMonth).where(eq(committedByMonth.userId, userId));
-    if (months.length > 0) await tx.insert(committedByMonth).values(months.map((m) => ({ userId, ...m })));
+    if (months.length > 0)
+      await tx.insert(committedByMonth).values(months.map((m) => ({ userId, ...m })));
   });
 
   return { months: months.length };
@@ -416,9 +525,16 @@ export async function processUserTransactions(userId: string) {
   const now = new Date();
   const referenceMonth = monthKeySaoPaulo(now);
   const { updated } = await normalizeAndCategorize(userId);
-  const { months } = await recomputeMonthlySummaries(userId);
+  // Parcelamentos antes dos resumos: a categoria escolhida pro parcelamento vai pras parcelas novas.
   const plans = await syncInstallmentPlans(userId, referenceMonth);
+  const { months } = await recomputeMonthlySummaries(userId);
   const { recurrences: recurrencesFound } = await syncRecurrences(userId, now);
   const committed = await recomputeCommittedByMonth(userId, referenceMonth, plans);
-  return { updated, months, installmentPlans: plans.length, recurrences: recurrencesFound, committedMonths: committed.months };
+  return {
+    updated,
+    months,
+    installmentPlans: plans.length,
+    recurrences: recurrencesFound,
+    committedMonths: committed.months,
+  };
 }

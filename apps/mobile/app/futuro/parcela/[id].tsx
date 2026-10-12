@@ -2,15 +2,29 @@
 //
 // Anel de progresso, total, já pago, falta, próxima e última parcela, e a dica sobre quitar
 // antecipado (texto fixo de produto, sem número calculado por IA — CLAUDE.md, princípio 2). Lê da
-// mesma lista de `GET /future/installments` da tela de Parcelas. "Editar" (§6.6) ainda não existe.
-import { colors, Donut, EmptyState, gradients, Icon, primitives, radius, ScreenHeader, Skeleton, space, typography } from '@planor/ui';
+// mesma lista de `GET /future/installments` da tela de Parcelas. O lápis abre "Editar parcelamento"
+// (nome, categoria, "Já quitei antecipado").
+import {
+  colors,
+  Donut,
+  EmptyState,
+  gradients,
+  Icon,
+  primitives,
+  radius,
+  ScreenHeader,
+  Skeleton,
+  space,
+  typography,
+} from '@planor/ui';
 import { monthNamePtBR } from '@planor/shared';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
-import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Money } from '@/components/Money';
 import { ScreenGlow } from '@/components/ScreenGlow';
+import { EditarParcelamentoSheet } from '@/features/parcelas/EditarParcelamentoSheet';
 import { useInstallmentsQuery } from '@/lib/api/queries';
 import { goBack } from '@/lib/navigation';
 
@@ -20,7 +34,15 @@ function dueLabel(due: string): string {
   return `${Number(due.slice(8, 10))} de ${monthNamePtBR(due.slice(0, 7))}`;
 }
 
-function ValueRow({ label, children, last = false }: { label: string; children: ReactNode; last?: boolean }) {
+function ValueRow({
+  label,
+  children,
+  last = false,
+}: {
+  label: string;
+  children: ReactNode;
+  last?: boolean;
+}) {
   return (
     <View style={[styles.valueRow, last ? null : styles.valueRowBorder]}>
       <Text style={styles.valueLabel}>{label}</Text>
@@ -32,6 +54,7 @@ function ValueRow({ label, children, last = false }: { label: string; children: 
 export default function ParcelaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, isPending, isError, refetch } = useInstallmentsQuery();
+  const [editVisible, setEditVisible] = useState(false);
 
   if (isPending) {
     return (
@@ -53,7 +76,11 @@ export default function ParcelaScreen() {
         <EmptyState
           icon="aviso"
           title={isError ? 'Não deu pra carregar' : 'Parcelamento não encontrado'}
-          text={isError ? 'Confira sua internet e tenta de novo.' : 'Ele pode ter terminado ou sido quitado.'}
+          text={
+            isError
+              ? 'Confira sua internet e tenta de novo.'
+              : 'Ele pode ter terminado ou sido quitado.'
+          }
           actionLabel={isError ? 'Tentar de novo' : 'Voltar'}
           onAction={() => (isError ? refetch() : goBack('/futuro/parcelas'))}
         />
@@ -65,7 +92,19 @@ export default function ParcelaScreen() {
     <View style={styles.screen}>
       <ScreenGlow />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <ScreenHeader title="Parcelamento" onBack={() => goBack('/futuro/parcelas')} />
+        <ScreenHeader
+          title="Parcelamento"
+          onBack={() => goBack('/futuro/parcelas')}
+          action={
+            <Pressable
+              style={styles.headerButton}
+              onPress={() => setEditVisible(true)}
+              accessibilityLabel="Editar parcelamento"
+            >
+              <Icon name="editar" size={20} color={colors.dark.text.primary} />
+            </Pressable>
+          }
+        />
 
         <View style={styles.summary}>
           <View style={styles.ring}>
@@ -73,7 +112,9 @@ export default function ParcelaScreen() {
               size={150}
               strokeWidth={14}
               trackColor={colors.dark.bg.elevated}
-              segments={[{ percent: (plan.current / plan.count) * 100, color: primitives.purple[300] }]}
+              segments={[
+                { percent: (plan.current / plan.count) * 100, color: primitives.purple[300] },
+              ]}
             />
             <View style={styles.ringCenter} pointerEvents="none">
               <Text style={styles.ringValue}>
@@ -84,13 +125,23 @@ export default function ParcelaScreen() {
           </View>
           <Text style={styles.name}>{plan.merchantName}</Text>
           <Text style={styles.subtitle}>
-            <Money cents={plan.installmentCents} style={styles.subtitle} /> por mês · {plan.bank}
+            {plan.settledEarly ? (
+              `Quitado antecipadamente · ${plan.bank}`
+            ) : (
+              <>
+                <Money cents={plan.installmentCents} style={styles.subtitle} /> por mês ·{' '}
+                {plan.bank}
+              </>
+            )}
           </Text>
         </View>
 
         <View style={styles.timeline}>
           {Array.from({ length: plan.count }, (_, i) => (
-            <View key={i} style={[styles.timelineStep, i < plan.current ? styles.timelineStepDone : null]} />
+            <View
+              key={i}
+              style={[styles.timelineStep, i < plan.current ? styles.timelineStepDone : null]}
+            />
           ))}
         </View>
 
@@ -101,18 +152,25 @@ export default function ParcelaScreen() {
           <ValueRow label="Já pago">
             <Money cents={plan.paidCents} style={[styles.value, styles.valueSuccess]} />
           </ValueRow>
-          <ValueRow label="Falta pagar">
-            <Money cents={plan.remainingCents} style={styles.value} />
-          </ValueRow>
-          <ValueRow label="Próxima parcela">
-            <Text style={styles.value}>{plan.nextDue ? dueLabel(plan.nextDue) : 'Esta é a última'}</Text>
-          </ValueRow>
+          {/* Quitado antecipadamente: não tem mais "falta" nem "próxima". */}
+          {!plan.settledEarly && (
+            <>
+              <ValueRow label="Falta pagar">
+                <Money cents={plan.remainingCents} style={styles.value} />
+              </ValueRow>
+              <ValueRow label="Próxima parcela">
+                <Text style={styles.value}>
+                  {plan.nextDue ? dueLabel(plan.nextDue) : 'Esta é a última'}
+                </Text>
+              </ValueRow>
+            </>
+          )}
           <ValueRow label="Última parcela" last>
             <Text style={styles.value}>{dueLabel(plan.lastMonth)}</Text>
           </ValueRow>
         </View>
 
-        {plan.remainingCents > 0 && (
+        {plan.remainingCents > 0 && !plan.settledEarly && (
           <LinearGradient
             colors={gradients.dicaIa.colors}
             start={gradients.dicaIa.start}
@@ -121,17 +179,34 @@ export default function ParcelaScreen() {
           >
             <Icon name="ia" size={20} color={colors.dark.text.brand} />
             <Text style={styles.tipText}>
-              Se sobrar dinheiro, peça ao banco o valor para quitar antecipado. A antecipação costuma vir com desconto nos juros.
+              Se sobrar dinheiro, peça ao banco o valor para quitar antecipado. A antecipação
+              costuma vir com desconto nos juros.
             </Text>
           </LinearGradient>
         )}
       </ScrollView>
+
+      <EditarParcelamentoSheet
+        plan={plan}
+        visible={editVisible}
+        onClose={() => setEditVisible(false)}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.dark.bg.default },
+  headerButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.dark.bg.surface,
+    borderWidth: 1,
+    borderColor: colors.dark.border.default,
+  },
   centered: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[24] },
   content: {
     paddingTop: space[60],
@@ -171,7 +246,13 @@ const styles = StyleSheet.create({
     color: colors.dark.text.secondary,
   },
   timeline: { flexDirection: 'row', justifyContent: 'center', gap: space[6], paddingTop: space[4] },
-  timelineStep: { flex: 1, maxWidth: 26, height: 8, borderRadius: 4, backgroundColor: colors.dark.bg.elevated },
+  timelineStep: {
+    flex: 1,
+    maxWidth: 26,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.dark.bg.elevated,
+  },
   timelineStepDone: { backgroundColor: primitives.purple[300] },
   values: {
     paddingHorizontal: space[20],
@@ -181,7 +262,12 @@ const styles = StyleSheet.create({
     borderColor: colors.dark.border.default,
     backgroundColor: colors.dark.bg.surface,
   },
-  valueRow: { height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  valueRow: {
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   valueRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.dark.border.default },
   valueLabel: {
     fontFamily: typography.bodyMedium.fontFamily,

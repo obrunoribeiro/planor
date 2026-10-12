@@ -796,6 +796,7 @@ GET  /spending/summary?period · GET /spending/category/:id
 GET  /future/timeline · /installments · /subscriptions · /bills · /statements/:id
 GET  /future/statements/:accountId?month=YYYY-MM  # fatura do cartão; sem month, a que vence a seguir
 POST /future/bills · DELETE /future/bills/:id   # "Nova conta fixa" cadastrada à mão
+PATCH /future/installments/:id (name, categoryId, settledEarly)   # "Editar parcelamento"
 PATCH /subscriptions/:id (usage, cancelled, reminder)
 GET/POST/PATCH /goals · POST /goals/:id/contributions
 GET  /alerts · POST /alerts/read
