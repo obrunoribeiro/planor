@@ -25,6 +25,14 @@ export type GradientToken = {
 };
 
 export const gradients = {
+  // Resumo de Assinaturas (Figma 31:591). Mesmas cores do `resumoParcelas`, 153,84°.
+  resumoAssinaturas: {
+    colors: ['#2B1A86', '#1A1440', '#16151A'],
+    locations: [0, 0.55, 1],
+    angle: 153.84,
+    start: { x: 0.28, y: 0.051 },
+    end: { x: 0.72, y: 0.949 },
+  },
   // Resumo de Parcelas (Figma 30:606). #2B1A86 → #1A1440 (55%) → #16151A, 160,37° — mesmas cores
   // do `totalGastos`, outro ângulo.
   resumoParcelas: {

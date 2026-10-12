@@ -40,7 +40,7 @@ function CommittedRow({
   subtitle: string;
   amountCents: number;
   last?: boolean;
-  /** TODO: Assinaturas e Fixos ainda não têm tela — §6.6. */
+  /** TODO: Fixos ainda não tem tela — §6.6. */
   onPress?: () => void;
 }) {
   return (
@@ -175,6 +175,7 @@ export default function FuturoScreen() {
                 title="Assinaturas"
                 subtitle={`${currentMonth.subscriptions.count} assinaturas`}
                 amountCents={currentMonth.subscriptions.amountCents}
+                onPress={() => router.push('/futuro/assinaturas')}
               />
               <CommittedRow
                 icon="repetir"

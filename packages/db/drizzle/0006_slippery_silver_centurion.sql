@@ -1,0 +1,1 @@
+ALTER TABLE "recurrences" ADD COLUMN "cancelled_at" timestamp with time zone;

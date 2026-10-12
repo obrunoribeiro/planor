@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectRecurrences, recurrenceMerchantKey, type RecurrenceTransaction } from './recurrences';
+import { detectRecurrences, latestPriceChange, recurrenceMerchantKey, type RecurrenceTransaction } from './recurrences';
 
 const NOW = new Date('2026-10-10T12:00:00Z');
 let seq = 0;
@@ -86,5 +86,20 @@ describe('detectRecurrences', () => {
       NOW,
     );
     expect(vivo).toMatchObject({ kind: 'recurring_bill', amountCents: 8386, estimated: true });
+  });
+});
+
+describe('latestPriceChange', () => {
+  it('compara o último valor com o anterior (Figma: Música R$ 19,90 → R$ 21,90 = Subiu 10%)', () => {
+    expect(
+      latestPriceChange([
+        { amountCents: 1990, at: '2026-06-21T12:00:00.000Z' },
+        { amountCents: 2190, at: '2026-09-21T12:00:00.000Z' },
+      ]),
+    ).toEqual({ fromCents: 1990, toCents: 2190, at: '2026-09-21T12:00:00.000Z', pct: 10 });
+  });
+
+  it('sem mudança de valor, não tem reajuste', () => {
+    expect(latestPriceChange([{ amountCents: 4090, at: '2026-03-12T12:00:00.000Z' }])).toBeNull();
   });
 });

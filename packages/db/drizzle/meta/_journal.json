@@ -43,6 +43,13 @@
       "when": 1791655110757,
       "tag": "0005_quiet_medusa",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791664244046,
+      "tag": "0006_slippery_silver_centurion",
+      "breakpoints": true
     }
   ]
 }

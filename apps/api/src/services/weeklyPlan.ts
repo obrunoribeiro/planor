@@ -2,7 +2,7 @@
 // é de um formato antigo, como o do seed), avalia ao vivo (progresso e conclusão automática) e
 // grava o que mudou. As regras moram em `packages/shared/src/calculations/weeklyPlan.ts`.
 import { and, eq, gte, inArray, isNull, lt, lte, ne, or } from 'drizzle-orm';
-import { accounts, categories, connections, creditCards, institutions, monthlySummaries, transactions, users, weeklyPlans } from '@planor/db';
+import { accounts, categories, connections, creditCards, institutions, monthlySummaries, recurrences, transactions, users, weeklyPlans } from '@planor/db';
 import {
   buildWeeklyPlan,
   evaluateWeeklyPlan,
@@ -28,12 +28,22 @@ function startOfDaySaoPaulo(dateKey: string): Date {
   return new Date(`${dateKey}T03:00:00Z`);
 }
 
+/** Assinaturas ativas que o usuário ainda não disse se usa (§6.3, passo 8). */
+function subscriptionsWithoutUsage(userId: string) {
+  return db
+    .select({ amountCents: recurrences.amountCents })
+    .from(recurrences)
+    .where(
+      and(eq(recurrences.userId, userId), eq(recurrences.kind, 'subscription'), eq(recurrences.status, 'active'), eq(recurrences.usage, 'unknown')),
+    );
+}
+
 async function gatherInput(userId: string, todayKey: string, now: Date): Promise<WeeklyPlanInput> {
   const month = todayKey.slice(0, 7);
   const previousMonths = lastMonthKeys(previousMonthKey(month), 3);
   const { start: monthStart } = monthRangeSaoPaulo(month);
 
-  const [[user], cards, summaries, categoryRows, uncategorized] = await Promise.all([
+  const [[user], cards, summaries, categoryRows, uncategorized, withoutUsage] = await Promise.all([
     db.select({ monthlyIncomeCents: users.monthlyIncomeCents }).from(users).where(eq(users.id, userId)),
     db
       .select({ bank: institutions.name, amountCents: creditCards.currentBillCents, dueDay: creditCards.dueDay })
@@ -64,6 +74,7 @@ async function gatherInput(userId: string, todayKey: string, now: Date): Promise
           lte(transactions.postedAt, now),
         ),
       ),
+    subscriptionsWithoutUsage(userId),
   ]);
 
   const byMonth = new Map(summaries.map((s) => [s.month, (s.byCategory as Record<string, number>) ?? {}]));
@@ -85,11 +96,12 @@ async function gatherInput(userId: string, todayKey: string, now: Date): Promise
       ),
     })),
     uncategorized: uncategorized.map((t) => ({ id: t.id, amountCents: -t.amountCents })),
+    subscriptionsWithoutUsage: withoutUsage,
   };
 }
 
 async function gatherLive(userId: string, items: WeeklyPlanItem[], todayKey: string, weekStart: string, now: Date) {
-  const [[user], weekRows] = await Promise.all([
+  const [[user], weekRows, withoutUsage] = await Promise.all([
     db.select({ monthlyIncomeCents: users.monthlyIncomeCents }).from(users).where(eq(users.id, userId)),
     db
       .select({ categoryId: transactions.categoryId, amountCents: transactions.amountCents })
@@ -104,6 +116,7 @@ async function gatherLive(userId: string, items: WeeklyPlanItem[], todayKey: str
           lte(transactions.postedAt, now),
         ),
       ),
+    subscriptionsWithoutUsage(userId),
   ]);
 
   const weekSpentByCategory: Record<string, number> = {};
@@ -123,6 +136,7 @@ async function gatherLive(userId: string, items: WeeklyPlanItem[], todayKey: str
   return {
     todayKey,
     incomeSet: (user?.monthlyIncomeCents ?? 0) > 0,
+    subscriptionsWithoutUsage: withoutUsage.length,
     weekSpentByCategory,
     stillUncategorizedIds: stillUncategorized.map((r) => r.id),
   };

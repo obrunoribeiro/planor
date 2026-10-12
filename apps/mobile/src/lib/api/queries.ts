@@ -14,6 +14,8 @@ import type {
   MeResponse,
   SettingsResponse,
   SpendingSummaryResponse,
+  SubscriptionsResponse,
+  SubscriptionUsage,
   TransactionDetailResponse,
   TransactionListFilters,
   TransactionListItem,
@@ -70,6 +72,35 @@ export function useInstallmentsQuery() {
     queryKey: ['installments'],
     queryFn: () => apiFetch<InstallmentsResponse>('/future/installments', { accessToken: accessToken! }),
     enabled: !!accessToken,
+  });
+}
+
+export function useSubscriptionsQuery() {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['subscriptions'],
+    queryFn: () => apiFetch<SubscriptionsResponse>('/future/subscriptions', { accessToken: accessToken! }),
+    enabled: !!accessToken,
+  });
+}
+
+/** "Você usa esse serviço?" e "Já cancelei"/desfazer (§6.6). Cancelar muda o comprometido, o
+ * "a vencer" e a Home — recalculados no job, então tudo que depende disso é relido. */
+export function useUpdateSubscriptionMutation(id: string) {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: { usage?: SubscriptionUsage; status?: 'active' | 'cancelled_by_user' }) =>
+      apiFetch<{ id: string; usage: SubscriptionUsage; status: string }>(`/subscriptions/${id}`, {
+        method: 'PATCH',
+        accessToken: accessToken!,
+        body: JSON.stringify(patch),
+      }),
+    onSuccess: () => {
+      for (const key of ['subscriptions', 'home', 'future-timeline', 'leftover-forecast', 'weekly-plan']) {
+        void queryClient.invalidateQueries({ queryKey: [key] });
+      }
+    },
   });
 }
 

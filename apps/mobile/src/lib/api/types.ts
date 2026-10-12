@@ -4,7 +4,7 @@ import type { Plan } from '@planor/shared';
 
 /** Mesmo formato de `WeeklyPlanItem` em `packages/shared/src/calculations/weeklyPlan.ts`. */
 export type WeeklyPlanItem = {
-  type: 'income' | 'card_bill' | 'category_limit' | 'categorize';
+  type: 'income' | 'card_bill' | 'subscription_usage' | 'category_limit' | 'categorize';
   title: string;
   description: string;
   actionLabel: string;
@@ -109,6 +109,31 @@ export type InstallmentsResponse = {
   remainingCents: number;
   lastMonth: string | null;
   plans: InstallmentPlanItem[];
+};
+
+export type SubscriptionUsage = 'high' | 'low' | 'none' | 'unknown';
+
+export type SubscriptionItem = {
+  id: string;
+  merchantName: string;
+  amountCents: number;
+  nextChargeAt: string | null;
+  usage: SubscriptionUsage;
+  status: 'active' | 'cancelled_by_user';
+  cancelledAt: string | null;
+  /** Banco da cobrança mais recente. */
+  bank: string | null;
+  /** Primeira cobrança da série detectada (ISO). */
+  since: string | null;
+  paidThisYearCents: number;
+  priceChange: { fromCents: number; toCents: number; at: string; pct: number } | null;
+};
+
+export type SubscriptionsResponse = {
+  monthlyCents: number;
+  yearlyCents: number;
+  unused: { count: number; monthlyCents: number };
+  items: SubscriptionItem[];
 };
 
 export type FutureTimelineResponse = {

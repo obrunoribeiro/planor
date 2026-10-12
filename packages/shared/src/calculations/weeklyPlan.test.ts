@@ -10,6 +10,7 @@ const base: WeeklyPlanInput = {
   cardBills: [],
   categories: [],
   uncategorized: [],
+  subscriptionsWithoutUsage: [],
 };
 
 describe('semana', () => {
@@ -74,6 +75,19 @@ describe('buildWeeklyPlan', () => {
     expect(categorize!.data.transactionIds).toEqual(['t14', 't13', 't12', 't11', 't10', 't9', 't8', 't7', 't6', 't5']);
   });
 
+  it('assinaturas sem uso marcado (caso real: 6 assinaturas, R$ 135,31) e conclui quando todas forem marcadas', () => {
+    const items = buildWeeklyPlan({
+      ...base,
+      subscriptionsWithoutUsage: [4090, 2490, 2151, 1990, 1457, 1353].map((amountCents) => ({ amountCents })),
+    });
+    expect(items[0]).toMatchObject({ type: 'subscription_usage', actionRoute: '/futuro/assinaturas' });
+    expect(plain(items[0]!.description)).toBe('6 assinaturas somam R$ 135,31 por mês. As que você não usa entram nas sugestões de corte.');
+
+    const live = { todayKey: '2026-10-10', incomeSet: true, weekSpentByCategory: {}, stillUncategorizedIds: [] };
+    expect(evaluateWeeklyPlan(items, { ...live, subscriptionsWithoutUsage: 2 })[0]!.completed).toBe(false);
+    expect(evaluateWeeklyPlan(items, { ...live, subscriptionsWithoutUsage: 0 })[0]).toMatchObject({ completed: true, completedAutomatically: true });
+  });
+
   it('no máximo 3 itens, na ordem de prioridade', () => {
     const items = buildWeeklyPlan({
       ...base,
@@ -88,7 +102,7 @@ describe('buildWeeklyPlan', () => {
 });
 
 describe('evaluateWeeklyPlan', () => {
-  const live = { todayKey: '2026-10-10', incomeSet: false, weekSpentByCategory: {}, stillUncategorizedIds: [] as string[] };
+  const live = { todayKey: '2026-10-10', incomeSet: false, subscriptionsWithoutUsage: 1, weekSpentByCategory: {}, stillUncategorizedIds: [] as string[] };
 
   it('conclui sozinho a renda e a categorização; não desmarca o que o usuário marcou', () => {
     const [income, bill, categorize] = buildWeeklyPlan({

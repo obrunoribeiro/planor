@@ -42,6 +42,9 @@ export const recurrences = pgTable('recurrences', {
   /** Histórico de valores, pra detectar reajuste: [{ amountCents, at }]. */
   priceHistory: jsonb('price_history').notNull().default([]),
   status: recurrenceStatusEnum('status').notNull().default('active'),
+  /** Quando o usuário tocou em "Já cancelei" (§6.6). Cobrança depois disso vira alerta
+   * `subscription_charged_after_cancel`. */
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
   /** true quando o valor é estimado pela média de 3 meses (ex.: conta de energia). */
   estimated: boolean('estimated').notNull().default(false),
 });
