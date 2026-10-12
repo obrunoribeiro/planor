@@ -423,7 +423,7 @@ protótipo do Figma.
   compras) ficou em Lazer, confirmado pelo Bruno. No primeiro teste, antes do
   `looksLikePersonName`, ~13 nomes de pessoa que vendem na maquininha foram enviados uma vez; as
   respostas deles foram apagadas do cache e não são mais enviados.
- — lápis no detalhe do parcelamento abre o sheet
+- **Editar parcelamento (§6.6, Figma 49:1137)** — lápis no detalhe do parcelamento abre o sheet
   `src/features/parcelas/EditarParcelamentoSheet.tsx`: nome, categoria e "Já quitei antecipado".
   `PATCH /future/installments/:id`; colunas novas `installment_plans.display_name` e
   `category_id` (migração `0008_regular_pet_avengers.sql`, já aplicada). O nome fica separado do
