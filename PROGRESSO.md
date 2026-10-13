@@ -423,6 +423,11 @@ protótipo do Figma.
   compras) ficou em Lazer, confirmado pelo Bruno. No primeiro teste, antes do
   `looksLikePersonName`, ~13 nomes de pessoa que vendem na maquininha foram enviados uma vez; as
   respostas deles foram apagadas do cache e não são mais enviados.
+- **Perfil sem dado de exemplo** — "Meu plano" lia "Grátis" do mock enquanto o card do topo
+  mostrava o plano real ("Família Pro" na conta do Bruno). Agora tudo vem do `GET /me`; "Ver o Pro"
+  só aparece no Grátis; "1 banco conectado" no singular; saíram "Biometria ativa" (biometria não
+  existe ainda), "Casa com Ana", "4 amigos" e "1 mês grátis" (as linhas v2 ficam só com o selo); a
+  versão vem do `app.json`. `src/lib/mocks/perfil.ts` foi removido.
 - **Ajustes de interface pedidos pelo Bruno (2026-10-13):** selos ("Pro", "v2") centralizados na
   linha do Perfil (`ListItem` centraliza o slot da direita); na lista de categorias de Gastos o
   texto da esquerda quebra linha e o valor/percentual não encolhem (antes "Ainda não detalhadas"
