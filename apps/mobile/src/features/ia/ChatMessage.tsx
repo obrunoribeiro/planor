@@ -2,12 +2,25 @@
 // ("Digitando"). O texto da IA obedece ao olho (useMaskedMoneyText); o cartão usa `Money`.
 import { colors, gradients, Logo, radius, space, typography } from '@planor/ui';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { Money } from '@/components/Money';
 import type { AiCategoryCard, AiMessage } from '@/lib/api/types';
 import { useMaskedMoneyText } from '@/lib/useMaskedMoneyText';
 
 const MAX_BAR_HEIGHT = 56;
+/** Tempo de cada fase de um pontinho do "digitando" (subir, descer, esperar 2×). */
+const TYPING_STEP_MS = 280;
 
 function Avatar() {
   return (
@@ -111,14 +124,39 @@ export function ChatMessage({ message }: { message: AiMessage }) {
   );
 }
 
-/** "Digitando" — a IA está consultando os dados e escrevendo. */
+/** Um pontinho do "digitando": sobe e acende, espera os outros dois e repete. */
+function TypingDot({ index }: { index: number }) {
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    progress.value = withDelay(
+      index * TYPING_STEP_MS,
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: TYPING_STEP_MS, easing: Easing.out(Easing.quad) }),
+          withTiming(0, { duration: TYPING_STEP_MS, easing: Easing.in(Easing.quad) }),
+          withTiming(0, { duration: TYPING_STEP_MS * 2 }),
+        ),
+        -1,
+      ),
+    );
+    return () => cancelAnimation(progress);
+  }, [index, progress]);
+  const style = useAnimatedStyle(() => ({
+    opacity: 0.35 + progress.value * 0.65,
+    transform: [{ translateY: -progress.value * 4 }],
+  }));
+  return <Animated.View style={[styles.typingDot, style]} />;
+}
+
+/** "Digitando" (Figma 50:1195) — a IA está consultando os dados e escrevendo. Os pontos sobem um
+ * depois do outro, em onda. */
 export function TypingMessage() {
   return (
     <View style={styles.assistantRow} accessibilityLabel="A Planor IA está escrevendo">
       <Avatar />
       <View style={[styles.assistantBubble, styles.typingBubble]}>
-        {[0.9, 0.6, 0.3].map((opacity) => (
-          <View key={opacity} style={[styles.typingDot, { opacity }]} />
+        {[0, 1, 2].map((index) => (
+          <TypingDot key={index} index={index} />
         ))}
       </View>
     </View>
@@ -174,7 +212,12 @@ const styles = StyleSheet.create({
     lineHeight: typography.bodyMedium.lineHeight,
     color: colors.dark.text.primary,
   },
-  typingBubble: { flexDirection: 'row', gap: space[6], paddingVertical: space[16] },
+  typingBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[6],
+    paddingVertical: space[16],
+  },
   typingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.dark.text.brand },
   noticeBubble: {
     flex: 1,
