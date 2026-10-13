@@ -18,7 +18,20 @@ export function initialsFromName(name: string | null | undefined): string {
   return name.trim().charAt(0).toUpperCase();
 }
 
-const MONTH_ABBREV_PT_BR = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const MONTH_ABBREV_PT_BR = [
+  'jan',
+  'fev',
+  'mar',
+  'abr',
+  'mai',
+  'jun',
+  'jul',
+  'ago',
+  'set',
+  'out',
+  'nov',
+  'dez',
+];
 
 /** "2027-07-01" → "jul/27" (última parcela, card de Parcelamentos). */
 export function monthYearShortLabel(dateKey: string): string {
@@ -47,17 +60,26 @@ function todaySaoPauloDateKey(): string {
 export function dayGroupLabel(dateKey: string): string {
   if (dateKey === todaySaoPauloDateKey()) return 'Hoje';
 
+  // Ontem = hoje − 1 (antes comparava a data com o dia anterior a ela mesma e nunca dava "Ontem").
+  const today = todaySaoPauloDateKey();
+  const yesterday = new Date(
+    Date.UTC(
+      Number(today.slice(0, 4)),
+      Number(today.slice(5, 7)) - 1,
+      Number(today.slice(8, 10)) - 1,
+    ),
+  );
+  const yesterdayKey = `${yesterday.getUTCFullYear()}-${String(yesterday.getUTCMonth() + 1).padStart(2, '0')}-${String(yesterday.getUTCDate()).padStart(2, '0')}`;
+  if (dateKey === yesterdayKey) return 'Ontem';
+
   const year = Number(dateKey.slice(0, 4));
   const month = Number(dateKey.slice(5, 7));
   const day = Number(dateKey.slice(8, 10));
-  const yesterday = new Date(Date.UTC(year, month - 1, day - 1));
-  const yesterdayKey = `${yesterday.getUTCFullYear()}-${String(yesterday.getUTCMonth() + 1).padStart(2, '0')}-${String(yesterday.getUTCDate()).padStart(2, '0')}`;
-  if (dateKey === yesterdayKey) return 'Ontem';
 
   return `${day} de ${monthNamePtBR(`${year}-${String(month).padStart(2, '0')}`)}`;
 }
 
-function saoPauloDateKey(date: Date): string {
+export function saoPauloDateKey(date: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(date);
 }
 
@@ -92,7 +114,11 @@ export function relativeTimeLabel(iso: string, now = new Date()): string {
 /** ISO → "hoje, 08:42" / "ontem, 08:42" / "4/10, 08:42" (sheet "Não conseguimos atualizar"). */
 export function dayTimeLabel(iso: string): string {
   const date = new Date(iso);
-  const time = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }).format(date);
+  const time = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
   const group = dayGroupLabel(saoPauloDateKey(date));
   const day = group === 'Hoje' ? 'hoje' : group === 'Ontem' ? 'ontem' : dayMonthFromIso(iso);
   return `${day}, ${time}`;
@@ -111,4 +137,15 @@ export function parseReaisInput(text: string): number | null {
   if (!normalized) return null;
   const value = Number(normalized);
   return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+/** Hora do alerta como no Figma (34:857): "há 5 min", "há 2 h"; de ontem pra trás, "3 out". */
+export function alertTimeLabel(iso: string, now = new Date()): string {
+  const minutes = Math.floor((now.getTime() - new Date(iso).getTime()) / 60_000);
+  if (minutes < 1) return 'agora';
+  if (minutes < 60) return `há ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24 && saoPauloDateKey(new Date(iso)) === saoPauloDateKey(now)) return `há ${hours} h`;
+  const key = saoPauloDateKey(new Date(iso));
+  return `${Number(key.slice(8, 10))} ${MONTH_ABBREV_PT_BR[Number(key.slice(5, 7)) - 1]}`;
 }

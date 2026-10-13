@@ -1,5 +1,14 @@
 // Topo da Home — "Sobra prevista" (CONTEXTO.md §6.4). Node 25:151 no Figma.
-import { Avatar, colors, gradients, GlowOrb, Icon, ProgressBar, space, typography } from '@planor/ui';
+import {
+  Avatar,
+  colors,
+  gradients,
+  GlowOrb,
+  Icon,
+  ProgressBar,
+  space,
+  typography,
+} from '@planor/ui';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -49,7 +58,11 @@ export function HeaderSobra({ userName, unreadAlerts, leftover, month }: HeaderS
           <Icon name="estrela" size={14} color={colors.dark.text.brand} />
           <Text style={styles.proBadgeLabel}>Planor Pro</Text>
         </View>
-        <Pressable style={styles.alertsButton} accessibilityLabel="Central de alertas">
+        <Pressable
+          style={styles.alertsButton}
+          onPress={() => router.push('/alertas')}
+          accessibilityLabel="Central de alertas"
+        >
           <Icon name="sino" size={20} color={colors.dark.text.primary} />
           {unreadAlerts > 0 && <View style={styles.alertsDot} />}
         </Pressable>
@@ -65,7 +78,11 @@ export function HeaderSobra({ userName, unreadAlerts, leftover, month }: HeaderS
             accessibilityLabel={hidden ? 'Mostrar valores' : 'Ocultar valores'}
           >
             <View style={styles.eyeWrap}>
-              <Icon name="olho" size={18} color={hidden ? colors.dark.text.brand : colors.dark.text.secondary} />
+              <Icon
+                name="olho"
+                size={18}
+                color={hidden ? colors.dark.text.brand : colors.dark.text.secondary}
+              />
               {/* O Figma só tem "Ícone/Olho" — sem variante fechada. Em vez de inventar um glifo
                   novo, risca o ícone real com um traço diagonal (igual o "slash" que outros apps
                   usam no olho fechado). Se um dia o Figma ganhar um ícone de olho fechado de
@@ -75,7 +92,11 @@ export function HeaderSobra({ userName, unreadAlerts, leftover, month }: HeaderS
           </Pressable>
         </View>
         {/* §6.4: "Tocar no valor abre 'Como calculamos a sobra'". */}
-        <Pressable onPress={() => router.push('/sobra')} accessibilityRole="button" accessibilityLabel="Como calculamos a sobra">
+        <Pressable
+          onPress={() => router.push('/sobra')}
+          accessibilityRole="button"
+          accessibilityLabel="Como calculamos a sobra"
+        >
           <Money style={styles.valueAmount} cents={leftover.projectedLeftoverCents} />
         </Pressable>
       </View>
@@ -94,18 +115,21 @@ export function HeaderSobra({ userName, unreadAlerts, leftover, month }: HeaderS
           <View style={styles.compositionLegendItem}>
             <View style={[styles.dot, { backgroundColor: '#C8C6FE' }]} />
             <Text style={styles.compositionLegendText}>
-              Gasto <Money style={styles.compositionLegendValue} cents={leftover.spentThisMonthCents} />
+              Gasto{' '}
+              <Money style={styles.compositionLegendValue} cents={leftover.spentThisMonthCents} />
             </Text>
           </View>
           <View style={styles.compositionLegendItem}>
             <View style={[styles.dot, { backgroundColor: colors.dark.bg.brand }]} />
             <Text style={styles.compositionLegendText}>
-              A vencer <Money style={styles.compositionLegendValue} cents={leftover.dueUntilMonthEndCents} />
+              A vencer{' '}
+              <Money style={styles.compositionLegendValue} cents={leftover.dueUntilMonthEndCents} />
             </Text>
           </View>
         </View>
         <Text style={styles.incomeNote}>
-          De uma renda de <Money style={styles.incomeNote} cents={leftover.monthlyIncomeCents} /> no mês
+          De uma renda de <Money style={styles.incomeNote} cents={leftover.monthlyIncomeCents} /> no
+          mês
         </Text>
       </View>
     </LinearGradient>

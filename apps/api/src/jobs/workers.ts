@@ -5,6 +5,7 @@ import { isItemGone } from '../lib/pluggy';
 import { PluggyOwnershipError, syncItem } from '../lib/pluggySync';
 import { checkConsentExpiry, markItemGone, syncAllConnections } from '../services/connectionJobs';
 import { processUserTransactions } from '../services/processTransactions';
+import { detectAlertsForAllUsers } from '../services/detectAlerts';
 import { generateWeeklyPlans } from '../services/weeklyPlan';
 import { getBoss, QUEUES, type ProcessTransactionsJob, type SyncConnectionJob } from './queue';
 
@@ -27,7 +28,10 @@ export async function startWorkers(log: FastifyBaseLogger) {
         // Item não existe mais no Pluggy (apagado lá, ou dado de seed com id inventado): marca
         // desconectado pra rodada agendada parar de tentar. O histórico importado fica.
         await markItemGone(job.data.itemId);
-        log.warn({ jobId: job.id, itemId: job.data.itemId }, 'item não existe no Pluggy — conexão marcada como desconectada');
+        log.warn(
+          { jobId: job.id, itemId: job.data.itemId },
+          'item não existe no Pluggy — conexão marcada como desconectada',
+        );
         return;
       }
       throw err; // pg-boss tenta de novo (retryLimit)
@@ -49,9 +53,17 @@ export async function startWorkers(log: FastifyBaseLogger) {
     log.info({ jobId: job?.id, ...result }, 'weekly-plan concluído');
   });
 
+  await boss.work(QUEUES.detectAlerts, async ([job]) => {
+    const result = await detectAlertsForAllUsers();
+    log.info({ jobId: job?.id, ...result }, 'detect-alerts concluído');
+  });
+
   await boss.work<ProcessTransactionsJob>(QUEUES.processTransactions, async ([job]) => {
     if (!job) return;
     const result = await processUserTransactions(job.data.userId);
-    log.info({ jobId: job.id, userId: job.data.userId, ...result }, 'process-transactions concluído');
+    log.info(
+      { jobId: job.id, userId: job.data.userId, ...result },
+      'process-transactions concluído',
+    );
   });
 }
