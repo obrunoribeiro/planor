@@ -520,7 +520,8 @@ protótipo do Figma.
   RevenueCat), "Meta criada" (33:755), classificador de intenção e cache de prompt.
 - Metas: seção "Em grupo" e metas da casa (Fase 5), estado vazio do Figma (82:2118 — hoje usa o
   `EmptyState` padrão), "Limite criado" (46:972), escolher ícone da meta, item de meta no plano da
-  semana. Metas fictícias do seed ainda na conta do Bruno (4, com 6 depósitos).
+  semana. As 4 metas fictícias do seed (com 6 depósitos e os participantes da meta em grupo) foram
+  apagadas da conta do Bruno em 2026-10-12, com o OK dele.
 - "Atualizar agora" leva ~1 min na conta do Bruno (1.135 transações): a sincronização grava uma
   transação por vez. Dá pra fazer em lote.
 
