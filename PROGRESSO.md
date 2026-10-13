@@ -423,6 +423,12 @@ protótipo do Figma.
   compras) ficou em Lazer, confirmado pelo Bruno. No primeiro teste, antes do
   `looksLikePersonName`, ~13 nomes de pessoa que vendem na maquininha foram enviados uma vez; as
   respostas deles foram apagadas do cache e não são mais enviados.
+- **Planor IA com streaming (SSE)** — `POST /ai/chat?stream=1` manda o texto aos pedaços
+  (`delta`) e termina com `done` (mesmo corpo da resposta sem stream). No app, `src/lib/api/aiStream.ts`
+  lê com o `fetch` do `expo/fetch` (o do React Native não lê o corpo aos poucos); o balão vai
+  enchendo e o "digitando" aparece só enquanto a IA consulta os dados. Usa o `fullStream` do AI SDK
+  (o `textStream` engole erro do provedor). O olho também esconde valor pela metade no fim do
+  texto ("R$ 1.720,").
 - **Cobrança duplicada de assinatura (§6.3, passo 5)** — alerta novo
   `subscription_duplicate_charge` (registrado no CONTEXTO §6.9): a mesma assinatura cobrou valor
   parecido (±5%) duas vezes em até 7 dias (`duplicateCharges` em packages/shared, com teste),
@@ -509,7 +515,7 @@ protótipo do Figma.
   cobrança depois do cancelamento só aparece no contador do sino (a central de alertas ainda não
   existe).
 - Passo 6 (fixo/variável pela recorrência).
-- Planor IA: resposta em streaming (SSE), voz (microfone, "Ouvindo" 50:1334),
+- Planor IA: voz (microfone, "Ouvindo" 50:1334),
   `simulate_purchase` (v2), o sheet "Limite de perguntas" com o Pro (51:1359, depende do
   RevenueCat), "Meta criada" (33:755), classificador de intenção e cache de prompt.
 - Metas: seção "Em grupo" e metas da casa (Fase 5), estado vazio do Figma (82:2118 — hoje usa o
@@ -557,9 +563,7 @@ protótipo do Figma.
   aberta). A aberta continua calculada em `credit_cards.current_bill_cents`. O card do Futuro, o
   plano da semana e a tela da fatura mostram "a fatura a pagar": a fechada enquanto falta pagar
   (mesmo atrasada), depois a aberta.
-- **Planor IA, primeira versão diferente do §6.7/§8:** resposta inteira (sem streaming SSE) — o
-  `fetch` do React Native não lê stream sem `expo/fetch`, e dá pra trocar depois sem mudar a tela;
-  um modelo só (Sonnet), sem o classificador de intenção barato (com 8 ferramentas o próprio
+- **Planor IA diferente do §6.7:** um modelo só (Sonnet), sem o classificador de intenção barato (com 8 ferramentas o próprio
   modelo escolhe bem, e um classificador seria outra chamada por pergunta); sem cache de prompt (o
   prompt de sistema tem menos que o mínimo de tokens que a Anthropic cacheia). Sugestão "Posso
   parcelar um celular?" saiu do início (simular compra é v2) e entraram "Quanto vai sobrar este

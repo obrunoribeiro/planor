@@ -70,6 +70,8 @@ export default function IaScreen() {
   const [draft, setDraft] = useState('');
   const [notice, setNotice] = useState<Notice | null>(null);
   const { mutate: send, isPending } = useAiChatMutation();
+  // Texto da resposta enquanto ela chega (SSE); vazio = ainda consultando os dados ("digitando").
+  const [streamingText, setStreamingText] = useState('');
   const { data: loaded } = useAiConversationQuery(params.conversationId);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -106,14 +108,21 @@ export default function IaScreen() {
         createdAt: new Date().toISOString(),
       },
     ]);
+    setStreamingText('');
     send(
-      { conversationId, message },
+      {
+        conversationId,
+        message,
+        onDelta: (delta) => setStreamingText((current) => current + delta),
+      },
       {
         onSuccess: (data) => {
           setConversationId(data.conversationId);
+          setStreamingText('');
           setMessages((current) => [...current, data.message]);
         },
         onError: (error) => {
+          setStreamingText('');
           if (error instanceof ApiError && error.status === 402) {
             setNotice({
               kind: 'quota',
@@ -134,7 +143,7 @@ export default function IaScreen() {
   useEffect(() => {
     const timer = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
     return () => clearTimeout(timer);
-  }, [messages.length, isPending, notice]);
+  }, [messages.length, isPending, notice, streamingText]);
 
   const activeBanks = (connections ?? []).filter((c) => c.status !== 'disconnected').length;
   const banksLabel =
@@ -254,7 +263,20 @@ export default function IaScreen() {
             {messages.map((message) => (
               <ChatMessage key={message.id} message={message} />
             ))}
-            {isPending && <TypingMessage />}
+            {isPending &&
+              (streamingText ? (
+                <ChatMessage
+                  message={{
+                    id: 'streaming',
+                    role: 'assistant',
+                    content: streamingText,
+                    card: null,
+                    createdAt: new Date().toISOString(),
+                  }}
+                />
+              ) : (
+                <TypingMessage />
+              ))}
           </View>
         )}
         {notice && (

@@ -3,8 +3,11 @@
 import { useHiddenValuesStore } from '@/lib/stores/useHiddenValuesStore';
 
 const MONEY_IN_TEXT = /R\$\s?-?[\d.]+,\d{2}/g;
+// Valor pela metade no fim do texto ("R$ 1.720,") — a resposta da Planor IA chega aos pedaços.
+const PARTIAL_MONEY_AT_END = /R\$\s?-?[\d.,]*$/;
 
 export function useMaskedMoneyText(): (text: string) => string {
   const hidden = useHiddenValuesStore((state) => state.hidden);
-  return (text) => (hidden ? text.replace(MONEY_IN_TEXT, 'R$ ••••') : text);
+  return (text) =>
+    hidden ? text.replace(MONEY_IN_TEXT, 'R$ ••••').replace(PARTIAL_MONEY_AT_END, 'R$ ••••') : text;
 }

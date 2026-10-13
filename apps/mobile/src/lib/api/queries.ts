@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { streamAiChat } from './aiStream';
 import { apiFetch, apiUpload } from './client';
 import type {
   AccountListItem,
@@ -7,7 +8,6 @@ import type {
   CategoryListItem,
   ConnectionListItem,
   FutureTimelineResponse,
-  AiChatResponse,
   AiConversationListItem,
   AiConversationResponse,
   AiUsage,
@@ -576,19 +576,21 @@ export function useAiConversationQuery(id: string | undefined) {
   });
 }
 
+/** Pergunta à Planor IA com a resposta chegando aos pedaços (`onDelta`, SSE). */
 export function useAiChatMutation() {
   const accessToken = useAccessToken();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { conversationId?: string; message: string }) =>
-      apiFetch<AiChatResponse>('/ai/chat', {
-        method: 'POST',
-        accessToken: accessToken!,
-        body: JSON.stringify(input),
-      }),
+    mutationFn: (input: {
+      conversationId?: string;
+      message: string;
+      onDelta: (text: string) => void;
+    }) => streamAiChat({ accessToken: accessToken!, ...input }),
     onSuccess: (data) => {
       queryClient.setQueryData(['ai-usage'], data.usage);
       void queryClient.invalidateQueries({ queryKey: ['ai-conversations'] });
+      // A IA pode ter criado nada, mas o usuário pode ter tocado em "Criar" num cartão antes.
+      void queryClient.invalidateQueries({ queryKey: ['goals'] });
     },
   });
 }
