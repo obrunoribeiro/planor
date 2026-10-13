@@ -1,9 +1,9 @@
 // Perfil — CONTEXTO.md §6.10. Node 34:649 no Figma.
 //
-// `user`/`plan` vêm de verdade do `GET /me`. O resto da tela (contas conectadas, segurança,
-// casa, amigos, indicação) depende de features que ainda não existem (Pluggy, Fase 5 — ver
-// CONTEXTO.md §13), então continua com texto de exemplo do mock até essas partes existirem.
+// Usuário, plano e contas vêm de verdade (`GET /me`, `GET /connections`). Casa, amigos e indicação
+// são v2 (Fase 5): a linha aparece com o selo "v2", sem valor inventado.
 import { Avatar, Badge, colors, Dialog, EmptyState, gradients, GlowOrb, Icon, ListItem, ScreenHeader, Skeleton, space, typography } from '@planor/ui';
+import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
@@ -13,7 +13,6 @@ import { useConnectionsQuery, useMeQuery } from '@/lib/api/queries';
 import { initialsFromName } from '@/lib/format';
 import { EditarPerfilSheet } from '@/features/perfil/EditarPerfilSheet';
 import { SegurancaSheet } from '@/features/perfil/SegurancaSheet';
-import { perfilMock } from '@/lib/mocks/perfil';
 import { goBack } from '@/lib/navigation';
 import type { Plan } from '@planor/shared';
 
@@ -22,6 +21,8 @@ const PLAN_LABEL: Record<Plan, string> = {
   pro: 'Plano Pro',
   pro_family: 'Plano Família Pro',
 };
+/** Valor curto da linha "Meu plano". */
+const PLAN_SHORT: Record<Plan, string> = { free: 'Grátis', pro: 'Pro', pro_family: 'Família Pro' };
 
 function GroupLabel({ children }: { children: string }) {
   return <Text style={styles.groupLabel}>{children}</Text>;
@@ -32,7 +33,7 @@ function Group({ children }: { children: ReactNode }) {
 }
 
 export default function PerfilScreen() {
-  const { account, security, household, friends, referral, version } = perfilMock;
+  const version = `Planor ${Constants.expoConfig?.version ?? ''}`.trim();
   const { signOut } = useAuth();
   const { data: me, isPending, isError, refetch } = useMeQuery();
   const { data: connections } = useConnectionsQuery();
@@ -99,12 +100,16 @@ export default function PerfilScreen() {
           <Icon name="estrela" size={22} color={colors.dark.text.primary} />
           <View style={styles.planTexts}>
             <Text style={styles.planLabel}>{PLAN_LABEL[me.plan]}</Text>
-            <Text style={styles.planDetail}>{connectedBanksCount} bancos conectados</Text>
+            <Text style={styles.planDetail}>
+              {connectedBanksCount} {connectedBanksCount === 1 ? 'banco conectado' : 'bancos conectados'}
+            </Text>
           </View>
-          {/* TODO: navegar pra /paywall quando essa tela existir (Fase 4, §13). */}
-          <Pressable style={styles.planButton}>
-            <Text style={styles.planButtonLabel}>Ver o Pro</Text>
-          </Pressable>
+          {/* Só no Grátis. TODO: navegar pra /paywall quando essa tela existir (RevenueCat). */}
+          {me.plan === 'free' && (
+            <Pressable style={styles.planButton}>
+              <Text style={styles.planButtonLabel}>Ver o Pro</Text>
+            </Pressable>
+          )}
         </LinearGradient>
 
         <GroupLabel>CONTA</GroupLabel>
@@ -119,14 +124,15 @@ export default function PerfilScreen() {
           <ListItem icon="banco" title="Conectar banco" onPress={() => router.push('/perfil/conectar-banco')} />
           <ListItem icon="upload" title="Importar fatura ou extrato" onPress={() => router.push('/perfil/importar-fatura')} />
           {/* TODO: navegar pra /perfil/meu-plano quando existir. */}
-          <ListItem icon="estrela" title="Meu plano" value={account.planLabel} last />
+          <ListItem icon="estrela" title="Meu plano" value={PLAN_SHORT[me.plan]} last />
         </Group>
 
         <GroupLabel>PREFERÊNCIAS</GroupLabel>
         <Group>
           {/* TODO: navegar pra /perfil/notificacoes quando existir. */}
           <ListItem icon="sino" title="Notificações" />
-          <ListItem icon="cadeado" title="Segurança" value={security.biometricLabel} onPress={() => setSegurancaVisible(true)} />
+          {/* Biometria ainda não existe (§10) — sem "Biometria ativa" de exemplo. */}
+          <ListItem icon="cadeado" title="Segurança" onPress={() => setSegurancaVisible(true)} />
           {/* TODO: navegar pra /perfil/privacidade quando existir. */}
           <ListItem icon="escudo" title="Privacidade e dados" />
           {/* TODO: Planor no WhatsApp é v2 (§6.10) — sem destino ainda. */}
@@ -136,9 +142,9 @@ export default function PerfilScreen() {
         <GroupLabel>JUNTOS</GroupLabel>
         <Group>
           {/* TODO: Família e casal, Amigos e Indique são v2 (§6.11, §6.12, §6.14) — sem destino ainda. */}
-          <ListItem icon="inicio" title="Família e casal" value={household.description} right={<Badge tone="alert" label="v2" />} />
-          <ListItem icon="pessoas" title="Amigos e feed" value={`${friends.count} amigos`} right={<Badge tone="alert" label="v2" />} />
-          <ListItem icon="presente" title="Indique e ganhe" value={referral.reward} right={<Badge tone="alert" label="v2" />} last />
+          <ListItem icon="inicio" title="Família e casal" right={<Badge tone="alert" label="v2" />} />
+          <ListItem icon="pessoas" title="Amigos e feed" right={<Badge tone="alert" label="v2" />} />
+          <ListItem icon="presente" title="Indique e ganhe" right={<Badge tone="alert" label="v2" />} last />
         </Group>
 
         <GroupLabel>SUPORTE</GroupLabel>
