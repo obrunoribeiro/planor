@@ -1,5 +1,6 @@
 import { boolean, date, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { id, recurrenceKindEnum, recurrenceStatusEnum, subscriptionUsageEnum } from './_shared';
+import { categories } from './categories';
 import { accounts } from './connections';
 import { users } from './users';
 
@@ -19,7 +20,14 @@ export const installmentPlans = pgTable('installment_plans', {
   current: integer('current').notNull(),
   firstDate: date('first_date').notNull(),
   lastDate: date('last_date').notNull(),
+  /** "Já quitei antecipado" (§6.6): sai do comprometido, do "a vencer" e dos totais de Parcelas. */
   settledEarly: boolean('settled_early').notNull().default(false),
+  /** Nome escolhido em "Editar parcelamento". `merchantName` continua o detectado — é a chave que
+   * casa o parcelamento entre sincronizações. */
+  displayName: text('display_name'),
+  /** Categoria escolhida em "Editar parcelamento"; vale pra todas as parcelas, inclusive as que
+   * ainda vão chegar. */
+  categoryId: uuid('category_id').references(() => categories.id),
 });
 
 /**

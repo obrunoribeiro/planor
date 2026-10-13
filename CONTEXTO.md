@@ -794,7 +794,9 @@ GET  /transactions?filters · GET /transactions/:id · PATCH /transactions/:id (
 POST /category-rules
 GET  /spending/summary?period · GET /spending/category/:id
 GET  /future/timeline · /installments · /subscriptions · /bills · /statements/:id
+GET  /future/statements/:accountId?month=YYYY-MM  # fatura do cartão; sem month, a que vence a seguir
 POST /future/bills · DELETE /future/bills/:id   # "Nova conta fixa" cadastrada à mão
+PATCH /future/installments/:id (name, categoryId, settledEarly)   # "Editar parcelamento"
 PATCH /subscriptions/:id (usage, cancelled, reminder)
 GET/POST/PATCH /goals · POST /goals/:id/contributions
 GET  /alerts · POST /alerts/read
@@ -832,6 +834,7 @@ POST /webhooks/revenuecat
   - registrar o que é enviado ao provedor de IA (servidores fora do Brasil);
   - usar API em plano que **não treina com os dados**.
 - **Anonimizar** antes de mandar ao LLM: sem CPF, números de conta ou nomes de terceiros; só agregados quando possível.
+  - **O que vai hoje (categorização, §6.3 passo 2.3):** nome do estabelecimento sem números, valor típico, quantidade de compras e se foi crédito, débito ou Pix pra empresa. Nada de nome/e-mail do usuário, conta, CPF, nem Pix pra pessoa ou nome que pareça de pessoa (`isAiEligible` em `packages/shared`). Provedor: Anthropic (API, que não treina com os dados).
 - **CVM:** a IA **não recomenda produto de investimento específico**.
 - Logs de acesso; rate limit na API; validação de webhooks por assinatura.
 - Pentest antes do lançamento público. É preciso ter CNPJ para contratar o agregador.
@@ -955,5 +958,5 @@ São os mesmos dados das telas do Figma. Use-os para os mocks e o seed. Os totai
 3. Preços finais: validar com a lista de espera e testes de pagamento.
 4. Nome definitivo e registro da marca no INPI ("Planor" é provisório).
 5. Hospedagem da API (Railway, Render ou Fly) e região mais próxima do Brasil.
-6. Provedor de IA final: testar Claude, GPT e Gemini com as mesmas 50 perguntas reais.
+6. Provedor de IA final: testar Claude, GPT e Gemini com as mesmas 50 perguntas reais. **Por ora: Claude** (Bruno, 2026-10-12) — Haiku 5.5 na categorização; o teste comparativo fica pra antes do lançamento.
 7. App ID da Meta para o compartilhamento nos stories do Instagram.

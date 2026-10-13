@@ -28,11 +28,11 @@ export function expiresInLabel(daysLeft: number): string {
   return `Vence em ${daysLeft} dias`;
 }
 
-export function BankAvatar({ name, size = 44 }: { name: string; size?: 44 | 64 | 72 }) {
+export function BankAvatar({ name, size = 44 }: { name: string; size?: 36 | 44 | 64 | 72 }) {
   const large = size > 44;
   return (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
-      <Text style={large ? styles.avatarTextLarge : styles.avatarText}>{institutionInitials(name)}</Text>
+      <Text style={large ? styles.avatarTextLarge : [styles.avatarText, size === 36 && styles.avatarTextSmall]}>{institutionInitials(name)}</Text>
     </View>
   );
 }
@@ -66,6 +66,8 @@ const styles = StyleSheet.create({
     letterSpacing: typography.labelSmall.letterSpacing,
     color: colors.dark.text.secondary,
   },
+  // 36 px (resumo da fatura do cartão no Figma): sigla em branco.
+  avatarTextSmall: { color: colors.dark.text.primary },
   avatarTextLarge: {
     fontFamily: typography.h3.fontFamily,
     fontSize: typography.h3.fontSize,

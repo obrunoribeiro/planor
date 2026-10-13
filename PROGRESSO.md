@@ -254,10 +254,9 @@ protótipo do Figma.
   saíram depois, na Fase 3 (ver lá). Do seed, só o `weekly_plans` ainda está na conta do Bruno.
   Atenção: rodar `db:seed` de novo recria tudo isso.
 - Importar fatura em **PDF** — precisa de extração de texto + LLM pra estruturar em JSON
-  validado com zod (CONTEXTO.md §6.2), e o provedor de IA final ainda é decisão em aberto
-  (CONTEXTO.md §15.6). `POST /imports` já devolve `501` com uma mensagem clara pra esse caso.
-- Pipeline, passo 2.3 (LLM barato pro que as regras não pegam) — depende do provedor de IA
-  (CONTEXTO.md §15.6). Hoje ~70% das saídas reais ficam sem categoria ("Outros").
+  validado com zod (CONTEXTO.md §6.2). O provedor já está escolhido (Claude, 2026-10-12); falta
+  fazer. `POST /imports` já devolve `501` com uma mensagem clara pra esse caso.
+- Pipeline, passo 2.3 — feito na Fase 3 (ver "Categorização por IA" lá).
 - Pipeline, passos 5–8 e o resto do passo 9 — viraram Fase 3 (ver a seção dela abaixo).
 - Push (Expo Notifications + `push-dispatcher`, §9) e central de alertas (`GET /alerts`, §6.9) —
   os alertas de conexão já são gravados, mas só aparecem no contador do sino.
@@ -311,9 +310,9 @@ protótipo do Figma.
   `undetailedBillCents` em `packages/shared` (com teste) = fatura atual − gastos da fatura aberta
   já recebidos; calculada na sincronização e gravada em `credit_cards.undetailed_cents` (migração
   `0005_quiet_medusa.sql`, já aplicada). Na conta do Bruno: R$ 1.410,07 → gasto de outubro
-  R$ 1.814,66, sobra R$ 4.631,07. Vale 0 enquanto a última fatura fechada não venceu (aí a
-  diferença seria a fatura fechada, não compra nova) e quando não há lançamento conhecido na
-  fatura aberta.
+  R$ 1.814,66, sobra R$ 4.631,07. Vale 0 sem fatura fechada conhecida e quando não há lançamento
+  conhecido na fatura aberta (desde a "Fatura do cartão", abaixo, a fatura fechada ainda não paga
+  é descontada do limite usado, então o valor não depende mais de ela ter vencido).
 - **"Como calculamos a sobra" (§6.4, Figma 83:2405)** — tela nova `apps/mobile/app/sobra.tsx`,
   aberta ao tocar no valor da sobra na Home. `GET /forecast/leftover` (rota nova,
   `apps/api/src/routes/forecast.ts`) devolve a mesma conta da Home aberta em parcelas: renda, já
@@ -381,20 +380,72 @@ protótipo do Figma.
   direto nos dados do Pluggy); parcelas futuras de nov/26 a abr/27 somam R$ 513,20 — exatamente a
   diferença entre limite usado e fatura do Nubank. Os 5 parcelamentos fictícios do seed saíram.
 
+- **Fatura do cartão (§6.6, Figma 48:1147)** — tela nova `apps/mobile/app/futuro/fatura/[id].tsx`,
+  aberta pelo card de fatura do Futuro (que antes não abria nada): total, fecha/vence, e a quebra
+  por parcelas, assinaturas, fixos, outras compras e "ainda não detalhado"; "Ver transações do
+  cartão" abre Transações já filtrado pela conta (`?accountId=`). `GET /future/statements/:id`
+  (era stub; `:id` = conta do cartão, `?month=YYYY-MM` opcional).
+- **Correção da fatura depois do fechamento** (2026-10-12): a fatura de outubro do Bruno fechou
+  em 11/10 e foi paga no mesmo dia, mas o Planor mostrava R$ 6.845,03 a pagar dia 18 e o plano da
+  semana pedia "Separar R$ 6.466,23". Motivo: um dia depois do fechamento, o Pluggy ainda manda os
+  lançamentos da fatura fechada sem `billId`, e o pagamento dela vem previsto pra fatura de
+  novembro. Agora a sincronização lê `GET /bills` do Pluggy (faturas fechadas, com total e
+  pagamentos) e grava em `card_statements` (migração `0007_clever_randall.sql`, já aplicada:
+  `paid_cents` + índice único cartão/mês). `cardBillSummary` e `cardBillToPay` em
+  `packages/shared` (com teste, inclusive os dois cenários reais de 10/10 e 12/10) separam a
+  fatura fechada da aberta pelo mês da última fechada. Resultado em 12/10: fatura de novembro
+  R$ 577,16 (R$ 198,36 de parcelas + R$ 378,80 ainda não detalhados), vence 18/11. Fecha dia 11 e
+  vence dia 18 vêm das últimas 3 faturas (o Nubank manda `balanceCloseDate` nulo — antes o
+  fechamento ficava no dia 1).
+- **Plano da semana: "Separar R$ X para a fatura" conclui sozinho** quando o banco informa o
+  pagamento (a fatura some da lista a pagar). O item desta semana do Bruno já aparece concluído.
+- **Valores do Futuro obedecem ao olho** — os números da aba usavam `formatCents` cru.
+- **Provedor de IA escolhido: Claude** (Bruno, 2026-10-12; resolve a §15.6 por ora — o teste com
+  50 perguntas em Claude/GPT/Gemini fica pra antes do lançamento). Conta no console da Anthropic
+  com crédito pré-pago e teto de gasto, chave `planor-dev` (90 dias) em `ANTHROPIC_API_KEY`. AI SDK
+  7 (`ai` + `@ai-sdk/anthropic`) em `apps/api`.
+- **Categorização por IA (§6.3, passo 2.3)** — `services/aiCategorization.ts`, chamado no
+  `process-transactions` depois das regras. Haiku 5.5 (`claude-haiku-5-5`), saída em JSON com a
+  categoria numa lista fechada (as do usuário + "Não sei"); pergunta por estabelecimento, em lotes
+  de 60, até 300 por rodada. Resposta guardada em `ai_merchant_categories` (migração
+  `0009_furry_nebula.sql`, já aplicada) — o mesmo estabelecimento nunca é perguntado de novo, e
+  compras novas dele usam a resposta guardada. Só aplica com confiança ≥ 0,6
+  (`AI_MIN_CONFIDENCE`); grava `category_source = 'ai'` e `confidence`. Regra do usuário ou
+  global que case depois passa por cima da IA; escolha manual nunca muda. Sem chave ou com erro do
+  provedor, não faz nada e tenta na próxima sincronização.
+  Privacidade (§10): só vai o nome do estabelecimento sem números (CPF/CNPJ/conta/código), o
+  valor típico e se foi crédito, débito ou Pix pra empresa — `isAiEligible`,
+  `looksLikePersonName` e `merchantNameForAi` em `packages/shared` (com teste). Pix/TED pra pessoa
+  e nome que parece de pessoa (quem vende na maquininha como pessoa física) não vão.
+  Na conta do Bruno (12/10): 211 estabelecimentos, ~22 mil tokens (< US$ 0,06), 38 s. Aplicado com
+  o OK dele: 456 compras categorizadas pela IA; sem categoria caiu de 688 (68%) pra 232 (23%) —
+  184 em que a IA não teve certeza e 48 que não podem ir (Pix/nome de pessoa). TikTok (149
+  compras) ficou em Lazer, confirmado pelo Bruno. No primeiro teste, antes do
+  `looksLikePersonName`, ~13 nomes de pessoa que vendem na maquininha foram enviados uma vez; as
+  respostas deles foram apagadas do cache e não são mais enviados.
+- **Editar parcelamento (§6.6, Figma 49:1137)** — lápis no detalhe do parcelamento abre o sheet
+  `src/features/parcelas/EditarParcelamentoSheet.tsx`: nome, categoria e "Já quitei antecipado".
+  `PATCH /future/installments/:id`; colunas novas `installment_plans.display_name` e
+  `category_id` (migração `0008_regular_pet_avengers.sql`, já aplicada). O nome fica separado do
+  detectado (`merchant_name` é a chave que casa o parcelamento entre sincronizações). A categoria
+  vai pra todas as parcelas, inclusive as que chegarem depois (o pipeline agora roda os
+  parcelamentos antes dos resumos do mês). Quitado sai do comprometido, do "a vencer", da Home e
+  dos totais de Parcelas, e fica no fim da lista como "quitado" (dá pra desfazer). Validado na
+  conta do Bruno e desfeito: quitar o PagTesouro tirou R$ 29,12 de cada mês até abril.
+
 **Falta:**
 - Assinaturas: "cobrança duplicada" (§6.3, passo 5) ainda não é detectada — entra junto com os
   alertas. Plano da semana: faltam os itens que dependem de metas e dos objetivos do onboarding.
-- Parcelas: "Editar parcelamento" (Figma 49:1137 — nome, categoria, aviso antes da última,
-  "Já quitei antecipado") e o filtro do topo ("Filtrar compromissos", 49:1095). Os valores das
-  linhas do bloco do mês no Futuro ainda usam `formatCents` e não obedecem ao olho.
-- Fixos: editar uma conta cadastrada à mão (hoje só remove). Fatura do cartão (Figma 48:1147,
-  `/future/statements/:id`) ainda é stub.
+- Parcelas: o filtro do topo ("Filtrar compromissos", 49:1095). "Avisar antes da última parcela"
+  (do sheet de editar) espera o push (§6.9).
+- Fixos: editar uma conta cadastrada à mão (hoje só remove). Fatura do cartão: trocar de mês
+  (a rota já aceita `?month=`, a tela ainda não tem seletor).
 - Assinaturas: "Me lembrar 3 dias antes da cobrança" (Figma 49:1269) e o lembrete de 30 dias do
   "Uso pouco" esperam o push (§6.9) — sem ele, "Lembrete criado" seria mentira. O alerta de
   cobrança depois do cancelamento só aparece no contador do sino (a central de alertas ainda não
   existe).
-- Passos 6–8 (fixo/variável pela recorrência, fora do padrão, uso de assinaturas), telas de Parcelas,
-  Assinaturas e Fixos (§6.6; `/future/installments` etc. ainda são stubs), alertas e push, IA.
+- Passos 6 e 7 (fixo/variável pela recorrência, gasto fora do padrão), central de alertas e push,
+  IA.
 - "Atualizar agora" leva ~1 min na conta do Bruno (1.135 transações): a sincronização grava uma
   transação por vez. Dá pra fazer em lote.
 
@@ -433,9 +484,17 @@ protótipo do Figma.
   outro número do §2). Recorrência mensal (até 35 dias) cobra uma vez por mês a partir do mês da
   próxima cobrança — somar o intervalo em dias faria um mês "pular" de vez em quando;
   recorrência com intervalo maior que 35 dias e sem data não entra (não dá pra saber o mês).
-- **Futuro não lê `card_statements`** — a sincronização ainda não grava faturas (falta data de
-  fechamento confiável). O card usa a fatura aberta calculada e o próximo vencimento pelo dia do
-  cartão.
+- **`card_statements` só guarda faturas fechadas** (vêm do `/bills` do Pluggy, que não lista a
+  aberta). A aberta continua calculada em `credit_cards.current_bill_cents`. O card do Futuro, o
+  plano da semana e a tela da fatura mostram "a fatura a pagar": a fechada enquanto falta pagar
+  (mesmo atrasada), depois a aberta.
+- **"Editar parcelamento" sem "Avisar antes da última parcela"** — sem push (§6.9) o aviso não
+  chegaria; mesma decisão do "Me lembrar 3 dias antes" das assinaturas.
+- **Fatura do cartão tem seções além do Figma** — "Outras compras" (compras avulsas) e "Ainda não
+  detalhado" (o que o banco cobrou e não mandou uma a uma). O Figma (48:1147) é de uma fatura
+  futura, só com parcelas, assinaturas e fixos; numa fatura real, sem essas duas linhas a soma
+  das seções não bateria com o total. Na fatura fechada o rótulo é "Fatura paga"/"Fatura
+  fechada" em vez de "Já comprometido", e a data diz "Fechou".
 
 - **Detalhe da categoria diz "compras", não "pedidos"** (Figma 28:396 usa "14 pedidos" porque o
   exemplo é Delivery) — a tela serve pra qualquer categoria, e "pedidos de Moradia" não faz
@@ -452,8 +511,9 @@ protótipo do Figma.
   usado, não a fatura — confirmado pelo Bruno em 2026-10-10: R$ 6.979,43 usado, fatura no app do
   Nubank R$ 6.466,23, e a conta bateu no centavo (R$ 513,20 de parcelas nov/26–abr/27). Somar só
   as transações da fatura aberta daria errado: o Pluggy ainda não tinha entregado R$ 1.410,07 de
-  compras recentes que já estavam no limite. Limitação: entre o fechamento e o pagamento, o
-  valor mostra fatura fechada + aberta.
+  compras recentes que já estavam no limite. Desde 2026-10-12 a conta também desconta o que falta
+  pagar da última fatura fechada (`cardBillSummary`), então entre o fechamento e o pagamento a
+  aberta não soma mais a fechada.
 - **Sem "Lembrar amanhã" em "Acesso vencendo"** (Figma 83:2288) — precisaria guardar um adiamento
   em algum lugar, e o aviso de 1 dia já sai sozinho pelo job.
 - **Sheet "Não conseguimos atualizar" diz "a cada 6 horas", não "a cada hora"** como no Figma

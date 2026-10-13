@@ -1,8 +1,14 @@
 // O que ainda cai entre agora e o fim do mês corrente — parcelas, assinaturas e fixos (§6.4).
 // Usado pela Home (sobra prevista) e por "Como calculamos a sobra" (`GET /forecast/leftover`).
-import { and, eq, gt, lt } from 'drizzle-orm';
-import { manualRecurringBills, recurrences, transactions } from '@planor/db';
-import { dueUntilMonthEnd, manualBillAsRecurrence, monthKeySaoPaulo, monthRangeSaoPaulo, type DueUntilMonthEnd } from '@planor/shared';
+import { and, eq, gt, isNull, lt, or } from 'drizzle-orm';
+import { installmentPlans, manualRecurringBills, recurrences, transactions } from '@planor/db';
+import {
+  dueUntilMonthEnd,
+  manualBillAsRecurrence,
+  monthKeySaoPaulo,
+  monthRangeSaoPaulo,
+  type DueUntilMonthEnd,
+} from '@planor/shared';
 import { db } from '../lib/db';
 
 export async function dueThisMonth(userId: string): Promise<DueUntilMonthEnd> {
@@ -17,9 +23,12 @@ export async function dueThisMonth(userId: string): Promise<DueUntilMonthEnd> {
         installmentPlanId: transactions.installmentPlanId,
       })
       .from(transactions)
+      .leftJoin(installmentPlans, eq(installmentPlans.id, transactions.installmentPlanId))
       .where(
         and(
           eq(transactions.userId, userId),
+          // Parcelamento quitado antecipadamente ("Já quitei antecipado", §6.6) não vence mais.
+          or(isNull(installmentPlans.id), eq(installmentPlans.settledEarly, false)),
           eq(transactions.isHidden, false),
           eq(transactions.isTransfer, false),
           gt(transactions.postedAt, now),
@@ -27,10 +36,17 @@ export async function dueThisMonth(userId: string): Promise<DueUntilMonthEnd> {
         ),
       ),
     db
-      .select({ kind: recurrences.kind, amountCents: recurrences.amountCents, nextChargeAt: recurrences.nextChargeAt })
+      .select({
+        kind: recurrences.kind,
+        amountCents: recurrences.amountCents,
+        nextChargeAt: recurrences.nextChargeAt,
+      })
       .from(recurrences)
       .where(and(eq(recurrences.userId, userId), eq(recurrences.status, 'active'))),
-    db.select({ amountCents: manualRecurringBills.amountCents, day: manualRecurringBills.day }).from(manualRecurringBills).where(eq(manualRecurringBills.userId, userId)),
+    db
+      .select({ amountCents: manualRecurringBills.amountCents, day: manualRecurringBills.day })
+      .from(manualRecurringBills)
+      .where(eq(manualRecurringBills.userId, userId)),
   ]);
   const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(now);
 
@@ -42,6 +58,9 @@ export async function dueThisMonth(userId: string): Promise<DueUntilMonthEnd> {
       isInstallment: t.installmentPlanId !== null || (t.installmentCount ?? 0) > 1,
     })),
     // "Nova conta fixa" cadastrada à mão entra igual a um fixo recorrente detectado.
-    recurrences: [...activeRecurrences, ...manualBills.map((bill) => manualBillAsRecurrence(bill, todayKey))],
+    recurrences: [
+      ...activeRecurrences,
+      ...manualBills.map((bill) => manualBillAsRecurrence(bill, todayKey)),
+    ],
   });
 }

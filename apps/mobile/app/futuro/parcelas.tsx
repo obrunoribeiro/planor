@@ -2,7 +2,16 @@
 //
 // Resumo (por mês, falta pagar, quando termina o último) e a lista com barra de progresso, como
 // "3 de 10 · Nubank · termina em jul/27 · falta R$ 1.680,00". Tocar abre o detalhe.
-import { colors, EmptyState, gradients, radius, ScreenHeader, Skeleton, space, typography } from '@planor/ui';
+import {
+  colors,
+  EmptyState,
+  gradients,
+  radius,
+  ScreenHeader,
+  Skeleton,
+  space,
+  typography,
+} from '@planor/ui';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -17,7 +26,7 @@ function PlanCard({ plan }: { plan: InstallmentPlanItem }) {
   const percent = (plan.current / plan.count) * 100;
   return (
     <Pressable
-      style={styles.card}
+      style={[styles.card, plan.settledEarly ? styles.cardSettled : null]}
       onPress={() => router.push({ pathname: '/futuro/parcela/[id]', params: { id: plan.id } })}
       accessibilityRole="button"
     >
@@ -25,7 +34,12 @@ function PlanCard({ plan }: { plan: InstallmentPlanItem }) {
         <Text style={styles.name} numberOfLines={1}>
           {plan.merchantName}
         </Text>
-        <Money cents={plan.installmentCents} suffix="/mês" style={styles.monthly} suffixStyle={styles.monthly} />
+        <Money
+          cents={plan.installmentCents}
+          suffix="/mês"
+          style={styles.monthly}
+          suffixStyle={styles.monthly}
+        />
       </View>
       <View style={styles.track}>
         <LinearGradient
@@ -37,9 +51,12 @@ function PlanCard({ plan }: { plan: InstallmentPlanItem }) {
       </View>
       <View style={styles.line}>
         <Text style={[styles.caption, styles.captionMain]}>
-          {plan.current} de {plan.count} · {plan.bank} · termina em {monthYearShortLabel(`${plan.lastMonth}-01`)}
+          {plan.current} de {plan.count} · {plan.bank} · termina em{' '}
+          {monthYearShortLabel(`${plan.lastMonth}-01`)}
         </Text>
-        {plan.remainingCents > 0 ? (
+        {plan.settledEarly ? (
+          <Text style={styles.caption}>quitado</Text>
+        ) : plan.remainingCents > 0 ? (
           <Text style={styles.caption}>
             falta <Money cents={plan.remainingCents} style={styles.caption} />
           </Text>
@@ -69,12 +86,19 @@ export default function ParcelasScreen() {
   if (isError) {
     return (
       <View style={[styles.screen, styles.centered]}>
-        <EmptyState icon="aviso" title="Não deu pra carregar" text="Confira sua internet e tenta de novo." actionLabel="Tentar de novo" onAction={() => refetch()} />
+        <EmptyState
+          icon="aviso"
+          title="Não deu pra carregar"
+          text="Confira sua internet e tenta de novo."
+          actionLabel="Tentar de novo"
+          onAction={() => refetch()}
+        />
       </View>
     );
   }
 
-  const count = data.plans.length;
+  // Quitados antecipadamente ficam no fim (a API já ordena) e fora da contagem.
+  const count = data.plans.filter((p) => !p.settledEarly).length;
 
   return (
     <View style={styles.screen}>
@@ -82,7 +106,7 @@ export default function ParcelasScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <ScreenHeader title="Parcelas" onBack={() => goBack('/futuro')} />
 
-        {count === 0 ? (
+        {data.plans.length === 0 ? (
           <View style={styles.emptyWrap}>
             <EmptyState
               icon="parcelas"
@@ -111,7 +135,9 @@ export default function ParcelasScreen() {
               </View>
               <Text style={styles.caption}>
                 {count === 1 ? '1 parcelamento ativo' : `${count} parcelamentos ativos`}
-                {data.lastMonth ? ` · o último termina em ${monthYearShortLabel(`${data.lastMonth}-01`)}` : ''}
+                {data.lastMonth
+                  ? ` · o último termina em ${monthYearShortLabel(`${data.lastMonth}-01`)}`
+                  : ''}
               </Text>
             </LinearGradient>
 
@@ -180,7 +206,13 @@ const styles = StyleSheet.create({
     lineHeight: typography.numberSmall.lineHeight,
     color: colors.dark.text.primary,
   },
-  track: { height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: colors.dark.border.strong },
+  cardSettled: { opacity: 0.6 },
+  track: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    backgroundColor: colors.dark.border.strong,
+  },
   fill: { height: '100%', borderRadius: 4 },
   captionMain: { flex: 1 },
   caption: {

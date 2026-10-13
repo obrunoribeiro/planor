@@ -2,14 +2,13 @@
 // é de um formato antigo, como o do seed), avalia ao vivo (progresso e conclusão automática) e
 // grava o que mudou. As regras moram em `packages/shared/src/calculations/weeklyPlan.ts`.
 import { and, eq, gte, inArray, isNull, lt, lte, ne, or } from 'drizzle-orm';
-import { accounts, categories, connections, creditCards, institutions, monthlySummaries, recurrences, transactions, users, weeklyPlans } from '@planor/db';
+import { categories, connections, monthlySummaries, recurrences, transactions, users, weeklyPlans } from '@planor/db';
 import {
   buildWeeklyPlan,
   evaluateWeeklyPlan,
   lastMonthKeys,
   monthlyAverageCents,
   monthRangeSaoPaulo,
-  nextDueDateKey,
   previousMonthKey,
   weekEndKey,
   weekRangeLabel,
@@ -18,6 +17,7 @@ import {
   type WeeklyPlanItem,
 } from '@planor/shared';
 import { db } from '../lib/db';
+import { cardBillsToPay } from './cardBills';
 
 function todayKeySaoPaulo(now: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(now);
@@ -45,13 +45,7 @@ async function gatherInput(userId: string, todayKey: string, now: Date): Promise
 
   const [[user], cards, summaries, categoryRows, uncategorized, withoutUsage] = await Promise.all([
     db.select({ monthlyIncomeCents: users.monthlyIncomeCents }).from(users).where(eq(users.id, userId)),
-    db
-      .select({ bank: institutions.name, amountCents: creditCards.currentBillCents, dueDay: creditCards.dueDay })
-      .from(creditCards)
-      .innerJoin(accounts, eq(accounts.id, creditCards.accountId))
-      .innerJoin(connections, eq(connections.id, accounts.connectionId))
-      .innerJoin(institutions, eq(institutions.id, connections.institutionId))
-      .where(and(eq(accounts.userId, userId), ne(connections.status, 'disconnected'))),
+    cardBillsToPay(userId, todayKey),
     db
       .select({ month: monthlySummaries.month, byCategory: monthlySummaries.byCategory })
       .from(monthlySummaries)
@@ -83,9 +77,7 @@ async function gatherInput(userId: string, todayKey: string, now: Date): Promise
   return {
     todayKey,
     monthlyIncomeCents: user?.monthlyIncomeCents ?? null,
-    cardBills: cards
-      .filter((c) => c.amountCents !== null)
-      .map((c) => ({ bank: c.bank, amountCents: c.amountCents!, dueDateKey: nextDueDateKey(c.dueDay, todayKey) })),
+    cardBills: cards.map((c) => ({ bank: c.bankName, amountCents: c.amountCents, dueDateKey: c.dueDateKey })),
     categories: categoryRows.map((c) => ({
       categoryId: c.id,
       name: c.name,
@@ -118,6 +110,7 @@ async function gatherLive(userId: string, items: WeeklyPlanItem[], todayKey: str
       ),
     subscriptionsWithoutUsage(userId),
   ]);
+  const billsToPay = await cardBillsToPay(userId, todayKey);
 
   const weekSpentByCategory: Record<string, number> = {};
   for (const row of weekRows) {
@@ -139,6 +132,7 @@ async function gatherLive(userId: string, items: WeeklyPlanItem[], todayKey: str
     subscriptionsWithoutUsage: withoutUsage.length,
     weekSpentByCategory,
     stillUncategorizedIds: stillUncategorized.map((r) => r.id),
+    cardBillsToPay: billsToPay.map((b) => ({ bank: b.bankName, dueDateKey: b.dueDateKey })),
   };
 }
 

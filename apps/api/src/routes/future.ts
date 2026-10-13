@@ -1,13 +1,39 @@
 // Linha do tempo, parcelas, assinaturas e fixos — CONTEXTO.md §6.6, §8.
-import { and, desc, eq, inArray, isNotNull, ne } from 'drizzle-orm';
-import { accounts, committedByMonth, connections, creditCards, installmentPlans, institutions, manualRecurringBills, recurrences, transactions } from '@planor/db';
-import { addMonthsToKey, installmentPlanProgress, latestPriceChange, monthAbbrevPtBR, monthKeySaoPaulo, monthNamePtBR, nextDueDateKey } from '@planor/shared';
+import { and, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
+import {
+  accounts,
+  cardStatements,
+  categories,
+  committedByMonth,
+  connections,
+  creditCards,
+  installmentPlans,
+  institutions,
+  manualRecurringBills,
+  recurrences,
+  transactions,
+} from '@planor/db';
+import {
+  addMonthsToKey,
+  billClosingDateKey,
+  dayInMonthKey,
+  installmentPlanProgress,
+  latestPriceChange,
+  monthAbbrevPtBR,
+  monthKeySaoPaulo,
+  monthNamePtBR,
+} from '@planor/shared';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { requireUserId } from '../lib/auth';
 import { db } from '../lib/db';
 import { enqueueProcessTransactions } from '../jobs/queue';
-import { notImplemented } from '../lib/stub';
+import {
+  calendarDateKey,
+  cardBillsToPay,
+  lastClosedBill,
+  todayKeySaoPaulo,
+} from '../services/cardBills';
 
 export async function futureRoutes(app: FastifyInstance) {
   // Uma rota só pra tudo que a tela "Futuro" mostra (mesmo padrão do `/home`) — as rotas de
@@ -30,39 +56,43 @@ export async function futureRoutes(app: FastifyInstance) {
     const totalCents = months.reduce((sum, m) => sum + m.amountCents, 0);
     const current = committedRows[0];
 
-    const plans = await db.select().from(installmentPlans).where(eq(installmentPlans.userId, userId));
+    const plans = await db
+      .select()
+      .from(installmentPlans)
+      .where(and(eq(installmentPlans.userId, userId), eq(installmentPlans.settledEarly, false)));
     const activeSubscriptions = await db
       .select()
       .from(recurrences)
-      .where(and(eq(recurrences.userId, userId), eq(recurrences.kind, 'subscription'), eq(recurrences.status, 'active')));
+      .where(
+        and(
+          eq(recurrences.userId, userId),
+          eq(recurrences.kind, 'subscription'),
+          eq(recurrences.status, 'active'),
+        ),
+      );
     const bills = await db
       .select()
       .from(recurrences)
-      .where(and(eq(recurrences.userId, userId), eq(recurrences.kind, 'recurring_bill'), eq(recurrences.status, 'active')));
+      .where(
+        and(
+          eq(recurrences.userId, userId),
+          eq(recurrences.kind, 'recurring_bill'),
+          eq(recurrences.status, 'active'),
+        ),
+      );
 
-    const manualBills = await db.select().from(manualRecurringBills).where(eq(manualRecurringBills.userId, userId));
+    const manualBills = await db
+      .select()
+      .from(manualRecurringBills)
+      .where(eq(manualRecurringBills.userId, userId));
     const billNames = [...bills.map((b) => b.merchantName), ...manualBills.map((b) => b.name)];
     const billsDescription =
       billNames.length <= 2
         ? billNames.join(' e ')
         : `${billNames.slice(0, 2).join(', ')} e mais ${billNames.length - 2}`;
 
-    // Fatura aberta de cada cartão conectado (`credit_cards.current_bill_cents`, calculada na
-    // sincronização). A sincronização ainda não grava `card_statements`; o vencimento sai do dia
-    // de vencimento do cartão.
-    const cards = await db
-      .select({
-        bankName: institutions.name,
-        totalCents: creditCards.currentBillCents,
-        dueDay: creditCards.dueDay,
-      })
-      .from(creditCards)
-      .innerJoin(accounts, eq(creditCards.accountId, accounts.id))
-      .innerJoin(connections, eq(accounts.connectionId, connections.id))
-      .innerJoin(institutions, eq(connections.institutionId, institutions.id))
-      .where(and(eq(accounts.userId, userId), ne(connections.status, 'disconnected'), isNotNull(creditCards.currentBillCents)));
-    const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
-    const statements = cards.map((card) => ({ bankName: card.bankName, totalCents: card.totalCents!, dueDate: nextDueDateKey(card.dueDay, todayKey) }));
+    // A fatura a pagar de cada cartão: a fechada enquanto falta pagar, depois a aberta.
+    const statements = await cardBillsToPay(userId);
 
     const lastMonthKey = committedRows.at(-1)?.month;
 
@@ -77,14 +107,21 @@ export async function futureRoutes(app: FastifyInstance) {
             label: monthNamePtBR(current.month),
             totalCents: current.installmentsCents + current.subscriptionsCents + current.billsCents,
             installments: { count: plans.length, amountCents: current.installmentsCents },
-            subscriptions: { count: activeSubscriptions.length, amountCents: current.subscriptionsCents },
-            bills: { description: billsDescription || 'Nenhum fixo recorrente', amountCents: current.billsCents },
+            subscriptions: {
+              count: activeSubscriptions.length,
+              amountCents: current.subscriptionsCents,
+            },
+            bills: {
+              description: billsDescription || 'Nenhum fixo recorrente',
+              amountCents: current.billsCents,
+            },
           }
         : null,
       statements: statements.map((s) => ({
+        accountId: s.accountId,
         bank: s.bankName,
-        amountCents: s.totalCents,
-        dueDate: s.dueDate,
+        amountCents: s.amountCents,
+        dueDate: s.dueDateKey,
       })),
     };
   });
@@ -106,6 +143,9 @@ export async function futureRoutes(app: FastifyInstance) {
         current: installmentPlans.current,
         firstDate: installmentPlans.firstDate,
         lastDate: installmentPlans.lastDate,
+        settledEarly: installmentPlans.settledEarly,
+        displayName: installmentPlans.displayName,
+        categoryId: installmentPlans.categoryId,
         bank: institutions.name,
         dueDay: creditCards.dueDay,
       })
@@ -116,12 +156,37 @@ export async function futureRoutes(app: FastifyInstance) {
       .leftJoin(creditCards, eq(creditCards.accountId, accounts.id))
       .where(eq(installmentPlans.userId, userId));
 
+    // Categoria atual: a escolhida em "Editar parcelamento" ou a da parcela mais recente.
+    const latestCategory = new Map<string, string>();
+    if (rows.length > 0) {
+      const linked = await db
+        .select({ planId: transactions.installmentPlanId, categoryId: transactions.categoryId })
+        .from(transactions)
+        .where(
+          and(
+            inArray(
+              transactions.installmentPlanId,
+              rows.map((r) => r.id),
+            ),
+            isNotNull(transactions.categoryId),
+          ),
+        )
+        .orderBy(desc(transactions.postedAt));
+      for (const row of linked)
+        if (row.planId && row.categoryId && !latestCategory.has(row.planId))
+          latestCategory.set(row.planId, row.categoryId);
+    }
+
     const plans = rows
       .map((row) => {
         const progress = installmentPlanProgress(row, referenceMonth, row.dueDay);
         return {
           id: row.id,
-          merchantName: row.merchantName,
+          // O nome escolhido em "Editar parcelamento" no lugar do detectado.
+          merchantName: row.displayName ?? row.merchantName,
+          detectedName: row.merchantName,
+          categoryId: row.categoryId ?? latestCategory.get(row.id) ?? null,
+          settledEarly: row.settledEarly,
           bank: row.bank,
           installmentCents: row.installmentCents,
           totalCents: row.totalCents,
@@ -132,13 +197,23 @@ export async function futureRoutes(app: FastifyInstance) {
           ...progress,
         };
       })
-      // Como no Figma (30:592): quem termina por último primeiro.
-      .sort((a, b) => b.lastMonth.localeCompare(a.lastMonth) || b.installmentCents - a.installmentCents);
+      // Como no Figma (30:592): quem termina por último primeiro. Os quitados antecipadamente
+      // ficam no fim e fora dos totais (como as assinaturas canceladas).
+      .sort(
+        (a, b) =>
+          Number(a.settledEarly) - Number(b.settledEarly) ||
+          b.lastMonth.localeCompare(a.lastMonth) ||
+          b.installmentCents - a.installmentCents,
+      );
+    const active = plans.filter((p) => !p.settledEarly);
 
     return {
-      monthlyCents: plans.reduce((sum, p) => sum + p.installmentCents, 0),
-      remainingCents: plans.reduce((sum, p) => sum + p.remainingCents, 0),
-      lastMonth: plans.reduce<string | null>((latest, p) => (!latest || p.lastMonth > latest ? p.lastMonth : latest), null),
+      monthlyCents: active.reduce((sum, p) => sum + p.installmentCents, 0),
+      remainingCents: active.reduce((sum, p) => sum + p.remainingCents, 0),
+      lastMonth: active.reduce<string | null>(
+        (latest, p) => (!latest || p.lastMonth > latest ? p.lastMonth : latest),
+        null,
+      ),
       plans,
     };
   });
@@ -151,14 +226,25 @@ export async function futureRoutes(app: FastifyInstance) {
     const rows = await db
       .select()
       .from(recurrences)
-      .where(and(eq(recurrences.userId, userId), eq(recurrences.kind, 'subscription'), ne(recurrences.status, 'ended')));
+      .where(
+        and(
+          eq(recurrences.userId, userId),
+          eq(recurrences.kind, 'subscription'),
+          ne(recurrences.status, 'ended'),
+        ),
+      );
     const ids = rows.map((r) => r.id);
 
     // "Cartão" = banco da cobrança mais recente; "Pago em [ano]" = soma das cobranças do ano.
     const yearStart = new Date(`${monthKeySaoPaulo(new Date()).slice(0, 4)}-01-01T03:00:00Z`);
     const charges = ids.length
       ? await db
-          .select({ recurrenceId: transactions.recurrenceId, amountCents: transactions.amountCents, postedAt: transactions.postedAt, bank: institutions.name })
+          .select({
+            recurrenceId: transactions.recurrenceId,
+            amountCents: transactions.amountCents,
+            postedAt: transactions.postedAt,
+            bank: institutions.name,
+          })
           .from(transactions)
           .innerJoin(accounts, eq(accounts.id, transactions.accountId))
           .innerJoin(connections, eq(connections.id, accounts.connectionId))
@@ -180,7 +266,9 @@ export async function futureRoutes(app: FastifyInstance) {
         cancelledAt: r.cancelledAt?.toISOString() ?? null,
         bank: own[0]?.bank ?? null,
         since: history[0]?.at ?? null,
-        paidThisYearCents: own.filter((c) => c.postedAt >= yearStart).reduce((sum, c) => sum - c.amountCents, 0),
+        paidThisYearCents: own
+          .filter((c) => c.postedAt >= yearStart)
+          .reduce((sum, c) => sum - c.amountCents, 0),
         priceChange: latestPriceChange(history),
       };
     });
@@ -191,7 +279,10 @@ export async function futureRoutes(app: FastifyInstance) {
     return {
       monthlyCents,
       yearlyCents: monthlyCents * 12,
-      unused: { count: unused.length, monthlyCents: unused.reduce((sum, i) => sum + i.amountCents, 0) },
+      unused: {
+        count: unused.length,
+        monthlyCents: unused.reduce((sum, i) => sum + i.amountCents, 0),
+      },
       items,
     };
   });
@@ -205,7 +296,13 @@ export async function futureRoutes(app: FastifyInstance) {
       db
         .select()
         .from(recurrences)
-        .where(and(eq(recurrences.userId, userId), eq(recurrences.kind, 'recurring_bill'), eq(recurrences.status, 'active'))),
+        .where(
+          and(
+            eq(recurrences.userId, userId),
+            eq(recurrences.kind, 'recurring_bill'),
+            eq(recurrences.status, 'active'),
+          ),
+        ),
       db.select().from(manualRecurringBills).where(eq(manualRecurringBills.userId, userId)),
     ]);
 
@@ -221,7 +318,12 @@ export async function futureRoutes(app: FastifyInstance) {
           .where(inArray(transactions.recurrenceId, ids))
           .orderBy(desc(transactions.postedAt))
       : [];
-    const dayOf = (date: Date) => Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', day: '2-digit' }).format(date));
+    const dayOf = (date: Date) =>
+      Number(
+        new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', day: '2-digit' }).format(
+          date,
+        ),
+      );
 
     const items = [
       ...detected.map((d) => ({
@@ -265,7 +367,13 @@ export async function futureRoutes(app: FastifyInstance) {
 
     const [created] = await db
       .insert(manualRecurringBills)
-      .values({ userId, name: body.data.name, amountCents: body.data.amountCents, day: body.data.day, paidWith: body.data.paidWith ?? null })
+      .values({
+        userId,
+        name: body.data.name,
+        amountCents: body.data.amountCents,
+        day: body.data.day,
+        paidWith: body.data.paidWith ?? null,
+      })
       .returning();
     await enqueueProcessTransactions(userId); // recalcula o comprometido
     return reply.code(201).send({ id: created!.id });
@@ -284,7 +392,199 @@ export async function futureRoutes(app: FastifyInstance) {
     await enqueueProcessTransactions(userId);
     return reply.code(204).send();
   });
-  app.get('/future/statements/:id', async (_req, reply) => notImplemented(reply, 'Fatura do cartão — Fase 3 (§6.6)'));
+  // "Editar parcelamento" (§6.6, Figma 49:1137): nome, categoria (vale pra todas as parcelas,
+  // inclusive as que ainda vão chegar) e "Já quitei antecipado". O aviso antes da última parcela
+  // espera o push (§6.9) — ver PROGRESSO.md.
+  const installmentPatch = z.object({
+    name: z.string().trim().max(60).nullable().optional(),
+    categoryId: z.string().uuid().nullable().optional(),
+    settledEarly: z.boolean().optional(),
+  });
+  app.patch('/future/installments/:id', async (request, reply) => {
+    const userId = await requireUserId(request, reply);
+    if (!userId) return;
+    const { id } = request.params as { id: string };
+    const body = installmentPatch.safeParse(request.body);
+    if (!body.success || Object.keys(body.data).length === 0)
+      return reply.code(400).send({ error: 'invalid_request' });
+
+    const [plan] = await db
+      .select()
+      .from(installmentPlans)
+      .where(and(eq(installmentPlans.id, id), eq(installmentPlans.userId, userId)));
+    if (!plan) return reply.code(404).send({ error: 'installment_plan_not_found' });
+
+    const { name, categoryId, settledEarly } = body.data;
+    if (categoryId) {
+      const [category] = await db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(
+          and(
+            eq(categories.id, categoryId),
+            or(isNull(categories.userId), eq(categories.userId, userId)),
+          ),
+        );
+      if (!category) return reply.code(400).send({ error: 'invalid_category' });
+    }
+
+    await db
+      .update(installmentPlans)
+      .set({
+        ...(name !== undefined ? { displayName: name || null } : {}),
+        ...(categoryId !== undefined ? { categoryId } : {}),
+        ...(settledEarly !== undefined ? { settledEarly } : {}),
+      })
+      .where(eq(installmentPlans.id, id));
+    if (categoryId) {
+      await db
+        .update(transactions)
+        .set({ categoryId, categorySource: 'manual' })
+        .where(and(eq(transactions.userId, userId), eq(transactions.installmentPlanId, id)));
+    }
+    // Comprometido, resumos do mês e "a vencer" mudam.
+    await enqueueProcessTransactions(userId);
+    return reply.code(204).send();
+  });
+
+  // Fatura do cartão (§6.6): `:id` é a conta do cartão; `?month=YYYY-MM` (mês do vencimento)
+  // escolhe a fatura — sem ele, a que o usuário tem que pagar a seguir (a mesma do card do Futuro).
+  // Quebra os lançamentos da fatura em parcelas, assinaturas, fixos e outras compras; o que o banco
+  // ainda não detalhou aparece separado, sem inventar categoria.
+  app.get('/future/statements/:id', async (request, reply) => {
+    const userId = await requireUserId(request, reply);
+    if (!userId) return;
+    const { id } = request.params as { id: string };
+    const query = z
+      .object({
+        month: z
+          .string()
+          .regex(/^\d{4}-\d{2}$/)
+          .optional(),
+      })
+      .safeParse(request.query);
+    if (!query.success) return reply.code(400).send({ error: 'invalid_request' });
+
+    const todayKey = todayKeySaoPaulo();
+    const card = (await cardBillsToPay(userId, todayKey)).find((c) => c.accountId === id);
+    if (!card) return reply.code(404).send({ error: 'card_not_found' });
+    const month = query.data.month ?? card.month;
+
+    const [[statement], [cardRow]] = await Promise.all([
+      db
+        .select()
+        .from(cardStatements)
+        .where(and(eq(cardStatements.accountId, id), eq(cardStatements.period, month))),
+      db.select().from(creditCards).where(eq(creditCards.accountId, id)),
+    ]);
+    const lastClosed = await lastClosedBill(id);
+    const openMonth = lastClosed
+      ? addMonthsToKey(lastClosed.month, 1)
+      : card.kind === 'open'
+        ? card.month
+        : null;
+    const kind: 'closed' | 'open' | 'future' = statement
+      ? 'closed'
+      : month === openMonth
+        ? 'open'
+        : 'future';
+
+    const rows = await db
+      .select({
+        amountCents: transactions.amountCents,
+        merchantName: transactions.merchantName,
+        installmentNumber: transactions.installmentNumber,
+        installmentCount: transactions.installmentCount,
+        planName: sql<
+          string | null
+        >`coalesce(${installmentPlans.displayName}, ${installmentPlans.merchantName})`,
+        recurrenceKind: recurrences.kind,
+        recurrenceName: recurrences.merchantName,
+        usage: recurrences.usage,
+      })
+      .from(transactions)
+      .leftJoin(installmentPlans, eq(installmentPlans.id, transactions.installmentPlanId))
+      .leftJoin(recurrences, eq(recurrences.id, transactions.recurrenceId))
+      .where(
+        and(
+          eq(transactions.accountId, id),
+          eq(transactions.userId, userId),
+          eq(transactions.billMonth, month),
+          eq(transactions.isHidden, false),
+        ),
+      );
+    // Só gastos: o pagamento da fatura anterior cai nesta fatura como crédito e não é compra.
+    const spends = rows
+      .filter((r) => r.amountCents < 0)
+      .map((r) => ({ ...r, cents: -r.amountCents }));
+
+    const installmentRows = spends.filter((r) => (r.installmentCount ?? 0) > 1);
+    const subscriptionRows = spends.filter(
+      (r) => !installmentRows.includes(r) && r.recurrenceKind === 'subscription',
+    );
+    const billRows = spends.filter(
+      (r) => !installmentRows.includes(r) && r.recurrenceKind === 'recurring_bill',
+    );
+    const otherRows = spends.filter((r) => !installmentRows.includes(r) && !r.recurrenceKind);
+    const sum = (list: { cents: number }[]) => list.reduce((total, r) => total + r.cents, 0);
+    const detailedCents = sum(spends);
+
+    const totalCents =
+      kind === 'closed'
+        ? statement!.totalCents
+        : kind === 'open'
+          ? (cardRow?.currentBillCents ?? detailedCents)
+          : detailedCents;
+    const undetailedCents =
+      kind === 'open'
+        ? (cardRow?.undetailedCents ?? 0)
+        : kind === 'closed'
+          ? Math.max(0, totalCents - detailedCents)
+          : 0;
+
+    const closingDate = statement
+      ? calendarDateKey(statement.closingDate)
+      : billClosingDateKey(month, card.closingDay, card.dueDay);
+    const dueDate = statement
+      ? calendarDateKey(statement.dueDate)
+      : dayInMonthKey(month, card.dueDay);
+
+    return {
+      accountId: id,
+      bank: card.bankName,
+      month,
+      kind,
+      paid: statement ? statement.paidCents >= statement.totalCents : false,
+      totalCents,
+      closingDate,
+      dueDate,
+      installments: {
+        totalCents: sum(installmentRows),
+        items: installmentRows
+          .sort((a, b) => b.cents - a.cents)
+          .map((r) => ({
+            name: r.planName ?? r.merchantName ?? 'Parcela',
+            number: r.installmentNumber,
+            count: r.installmentCount,
+            amountCents: r.cents,
+          })),
+      },
+      subscriptions: {
+        totalCents: sum(subscriptionRows),
+        count: subscriptionRows.length,
+        unusedCount: subscriptionRows.filter((r) => r.usage === 'none').length,
+      },
+      bills: {
+        totalCents: sum(billRows),
+        items: billRows.map((r) => ({
+          name: r.recurrenceName ?? r.merchantName ?? 'Conta fixa',
+          amountCents: r.cents,
+        })),
+      },
+      otherPurchases: { totalCents: sum(otherRows), count: otherRows.length },
+      undetailedCents,
+    };
+  });
   // "Você usa esse serviço?" e "Já cancelei" / desfazer (§6.6). O lembrete de 3 dias antes da
   // cobrança fica pra quando existir push (§6.9) — ver PROGRESSO.md.
   const subscriptionPatch = z.object({
@@ -296,9 +596,13 @@ export async function futureRoutes(app: FastifyInstance) {
     if (!userId) return;
     const { id } = request.params as { id: string };
     const body = subscriptionPatch.safeParse(request.body);
-    if (!body.success || (!body.data.usage && !body.data.status)) return reply.code(400).send({ error: 'invalid_request' });
+    if (!body.success || (!body.data.usage && !body.data.status))
+      return reply.code(400).send({ error: 'invalid_request' });
 
-    const [current] = await db.select().from(recurrences).where(and(eq(recurrences.id, id), eq(recurrences.userId, userId)));
+    const [current] = await db
+      .select()
+      .from(recurrences)
+      .where(and(eq(recurrences.id, id), eq(recurrences.userId, userId)));
     if (!current) return reply.code(404).send({ error: 'subscription_not_found' });
 
     const statusChanged = body.data.status !== undefined && body.data.status !== current.status;
@@ -306,7 +610,12 @@ export async function futureRoutes(app: FastifyInstance) {
       .update(recurrences)
       .set({
         ...(body.data.usage ? { usage: body.data.usage } : {}),
-        ...(statusChanged ? { status: body.data.status, cancelledAt: body.data.status === 'cancelled_by_user' ? new Date() : null } : {}),
+        ...(statusChanged
+          ? {
+              status: body.data.status,
+              cancelledAt: body.data.status === 'cancelled_by_user' ? new Date() : null,
+            }
+          : {}),
       })
       .where(eq(recurrences.id, id))
       .returning();

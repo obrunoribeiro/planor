@@ -1,0 +1,2 @@
+ALTER TABLE "card_statements" ADD COLUMN "paid_cents" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "card_statements_account_period_idx" ON "card_statements" USING btree ("account_id","period");

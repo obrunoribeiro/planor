@@ -1,11 +1,11 @@
 // Futuro · Linha do tempo — CONTEXTO.md §6.6. Node 30:459 no Figma.
-import { formatCents } from '@planor/shared';
 import { Badge, Chip, colors, EmptyState, gradients, GlowOrb, Icon, RevealScrollView, Skeleton, space, typography, useRevealProgress, type IconName } from '@planor/ui';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
+import { Money } from '@/components/Money';
 import { capitalize, dueDayMonthLabel } from '@/lib/format';
 import { useFutureTimelineQuery } from '@/lib/api/queries';
 
@@ -51,7 +51,7 @@ function CommittedRow({
         <Text style={styles.rowTitle}>{title}</Text>
         <Text style={styles.rowSubtitle}>{subtitle}</Text>
       </View>
-      <Text style={styles.rowAmount}>{formatCents(amountCents)}</Text>
+      <Money cents={amountCents} style={styles.rowAmount} />
       <Icon name="seta-direita" size={16} color={colors.dark.text.tertiary} />
     </Pressable>
   );
@@ -136,7 +136,7 @@ export default function FuturoScreen() {
           >
             <View style={styles.committedHeader}>
               <Text style={styles.committedLabel}>Já comprometido até {committed.untilLabel}</Text>
-              <Text style={styles.committedAmount}>{formatCents(committed.totalCents)}</Text>
+              <Money cents={committed.totalCents} style={styles.committedAmount} />
               <Text style={styles.committedHint}>Parcelas, assinaturas e gastos fixos que já vão cair na fatura.</Text>
             </View>
 
@@ -158,7 +158,7 @@ export default function FuturoScreen() {
           <>
             <View style={styles.monthHeader}>
               <Text style={styles.monthTitle}>{capitalize(currentMonth.label)}</Text>
-              <Text style={styles.monthAmount}>{formatCents(currentMonth.totalCents)}</Text>
+              <Money cents={currentMonth.totalCents} style={styles.monthAmount} />
             </View>
 
             <View style={styles.monthCard}>
@@ -191,10 +191,14 @@ export default function FuturoScreen() {
         {statements.length > 0 && (
           <View style={styles.statements}>
             {statements.map((statement) => (
-              // TODO: navegar pra /futuro/fatura/[cardId] quando essa tela existir.
-              <Pressable key={statement.bank} style={styles.statementCard}>
+              <Pressable
+                key={statement.accountId}
+                style={styles.statementCard}
+                onPress={() => router.push({ pathname: '/futuro/fatura/[id]', params: { id: statement.accountId } })}
+                accessibilityRole="button"
+              >
                 <Text style={styles.statementLabel}>Fatura {statement.bank}</Text>
-                <Text style={styles.statementAmount}>{formatCents(statement.amountCents)}</Text>
+                <Money cents={statement.amountCents} style={styles.statementAmount} />
                 <Text style={styles.statementDue}>{dueDayMonthLabel(statement.dueDate)}</Text>
               </Pressable>
             ))}

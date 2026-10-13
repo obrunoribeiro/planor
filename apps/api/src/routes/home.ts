@@ -12,7 +12,12 @@ import {
   transactions,
   users,
 } from '@planor/db';
-import { monthAbbrevPtBR, previousMonthKey, projectedLeftover, trendVsPreviousPct } from '@planor/shared';
+import {
+  monthAbbrevPtBR,
+  previousMonthKey,
+  projectedLeftover,
+  trendVsPreviousPct,
+} from '@planor/shared';
 import type { FastifyInstance } from 'fastify';
 import { requireUserId } from '../lib/auth';
 import { db } from '../lib/db';
@@ -54,7 +59,9 @@ async function dailySpendCumulative(userId: string, month: string): Promise<numb
   let lastDay = 1;
   for (const row of rows) {
     const day = Number(
-      new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', day: '2-digit' }).format(row.postedAt),
+      new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', day: '2-digit' }).format(
+        row.postedAt,
+      ),
     );
     byDay.set(day, (byDay.get(day) ?? 0) + Math.abs(row.amountCents));
     if (day > lastDay) lastDay = day;
@@ -86,7 +93,12 @@ export async function homeRoutes(app: FastifyInstance) {
     const [previousSummary] = await db
       .select({ spentCents: monthlySummaries.spentCents })
       .from(monthlySummaries)
-      .where(and(eq(monthlySummaries.userId, userId), eq(monthlySummaries.month, previousMonthKey(month))));
+      .where(
+        and(
+          eq(monthlySummaries.userId, userId),
+          eq(monthlySummaries.month, previousMonthKey(month)),
+        ),
+      );
 
     const monthlyIncomeCents = user.monthlyIncomeCents ?? 0;
     // Só faz sentido no mês corrente — mês passado não tem mais nada "a vencer" nem compra por
@@ -119,11 +131,24 @@ export async function homeRoutes(app: FastifyInstance) {
     const activeSubscriptions = await db
       .select()
       .from(recurrences)
-      .where(and(eq(recurrences.userId, userId), eq(recurrences.kind, 'subscription'), eq(recurrences.status, 'active')));
-    const subscriptionsMonthlyCents = activeSubscriptions.reduce((sum, s) => sum + s.amountCents, 0);
+      .where(
+        and(
+          eq(recurrences.userId, userId),
+          eq(recurrences.kind, 'subscription'),
+          eq(recurrences.status, 'active'),
+        ),
+      );
+    const subscriptionsMonthlyCents = activeSubscriptions.reduce(
+      (sum, s) => sum + s.amountCents,
+      0,
+    );
     const unusedSubscriptions = activeSubscriptions.filter((s) => s.usage === 'none').length;
 
-    const plans = await db.select().from(installmentPlans).where(eq(installmentPlans.userId, userId));
+    // Quitados antecipadamente ("Já quitei antecipado", §6.6) não contam.
+    const plans = await db
+      .select()
+      .from(installmentPlans)
+      .where(and(eq(installmentPlans.userId, userId), eq(installmentPlans.settledEarly, false)));
     const installmentsMonthlyCents = plans.reduce((sum, p) => sum + p.installmentCents, 0);
     const lastInstallmentDate = plans.reduce<string | null>(
       (latest, p) => (!latest || p.lastDate > latest ? p.lastDate : latest),
@@ -151,7 +176,8 @@ export async function homeRoutes(app: FastifyInstance) {
       committed: nextMonth
         ? {
             nextMonthLabel: monthAbbrevPtBR(nextMonth.month),
-            nextMonthAmountCents: nextMonth.installmentsCents + nextMonth.subscriptionsCents + nextMonth.billsCents,
+            nextMonthAmountCents:
+              nextMonth.installmentsCents + nextMonth.subscriptionsCents + nextMonth.billsCents,
             months: committedMonths,
           }
         : null,
@@ -181,14 +207,17 @@ export async function homeRoutes(app: FastifyInstance) {
         count: plans.length,
         monthlyCents: installmentsMonthlyCents,
         lastInstallmentDate,
-        progress: plans.slice(0, 3).map((p) => ({ label: `${p.current}/${p.count}`, percent: (p.current / p.count) * 100 })),
+        progress: plans
+          .slice(0, 3)
+          .map((p) => ({ label: `${p.current}/${p.count}`, percent: (p.current / p.count) * 100 })),
       },
       fixedVsVariable: {
         fixedCents: summary?.fixedCents ?? 0,
         variableCents: summary?.variableCents ?? 0,
-        fixedPct: summary && summary.fixedCents + summary.variableCents > 0
-          ? Math.round((summary.fixedCents / (summary.fixedCents + summary.variableCents)) * 100)
-          : 0,
+        fixedPct:
+          summary && summary.fixedCents + summary.variableCents > 0
+            ? Math.round((summary.fixedCents / (summary.fixedCents + summary.variableCents)) * 100)
+            : 0,
       },
       // `monthly_recaps` ainda não é gerado (job da Fase 5, CONTEXTO.md §6.13) — o card de
       // retrospectiva na Home só aparece quando isso vier preenchido de verdade.

@@ -167,6 +167,22 @@ export async function listTransactions(accountId: string): Promise<PluggyTransac
   return transactions;
 }
 
+/** Fatura fechada do cartão. Confirmado na conta real do Bruno (Nubank, 2026-10-12): vem uma por
+ * mês, com `billClosingDate`/`dueDate` e os pagamentos (quem paga no dia do fechamento já aparece
+ * com `FULL_PAYMENT`). A fatura aberta não vem nesta lista. */
+export type PluggyBill = {
+  id: string;
+  dueDate: string;
+  billClosingDate?: string | null;
+  totalAmount: number;
+  payments?: { amount: number }[] | null;
+};
+
+export async function listBills(accountId: string): Promise<PluggyBill[]> {
+  const { results } = await pluggyFetch<{ results: PluggyBill[] }>(`/bills?accountId=${accountId}`);
+  return results;
+}
+
 /** Registra (ou re-registra) o webhook pra `url`. O Pluggy não assina o payload — o header
  * customizado aqui é a nossa forma de conferir que a chamada é legítima (ver
  * `routes/connections.ts`). Chamar de novo depois que a URL pública mudar (ex.: ngrok reiniciou). */

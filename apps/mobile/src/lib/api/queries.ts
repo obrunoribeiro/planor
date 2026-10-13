@@ -7,6 +7,7 @@ import type {
   CategoryListItem,
   ConnectionListItem,
   FutureTimelineResponse,
+  CardStatementResponse,
   FixedBillsResponse,
   HomeResponse,
   InstallmentsResponse,
@@ -53,7 +54,8 @@ export function useSpendingSummaryQuery() {
   const accessToken = useAccessToken();
   return useQuery({
     queryKey: ['spending-summary'],
-    queryFn: () => apiFetch<SpendingSummaryResponse>('/spending/summary', { accessToken: accessToken! }),
+    queryFn: () =>
+      apiFetch<SpendingSummaryResponse>('/spending/summary', { accessToken: accessToken! }),
     enabled: !!accessToken,
   });
 }
@@ -62,7 +64,8 @@ export function useLeftoverForecastQuery() {
   const accessToken = useAccessToken();
   return useQuery({
     queryKey: ['leftover-forecast'],
-    queryFn: () => apiFetch<LeftoverForecastResponse>('/forecast/leftover', { accessToken: accessToken! }),
+    queryFn: () =>
+      apiFetch<LeftoverForecastResponse>('/forecast/leftover', { accessToken: accessToken! }),
     enabled: !!accessToken,
   });
 }
@@ -71,7 +74,8 @@ export function useInstallmentsQuery() {
   const accessToken = useAccessToken();
   return useQuery({
     queryKey: ['installments'],
-    queryFn: () => apiFetch<InstallmentsResponse>('/future/installments', { accessToken: accessToken! }),
+    queryFn: () =>
+      apiFetch<InstallmentsResponse>('/future/installments', { accessToken: accessToken! }),
     enabled: !!accessToken,
   });
 }
@@ -80,7 +84,8 @@ export function useSubscriptionsQuery() {
   const accessToken = useAccessToken();
   return useQuery({
     queryKey: ['subscriptions'],
-    queryFn: () => apiFetch<SubscriptionsResponse>('/future/subscriptions', { accessToken: accessToken! }),
+    queryFn: () =>
+      apiFetch<SubscriptionsResponse>('/future/subscriptions', { accessToken: accessToken! }),
     enabled: !!accessToken,
   });
 }
@@ -98,10 +103,28 @@ export function useUpdateSubscriptionMutation(id: string) {
         body: JSON.stringify(patch),
       }),
     onSuccess: () => {
-      for (const key of ['subscriptions', 'home', 'future-timeline', 'leftover-forecast', 'weekly-plan']) {
+      for (const key of [
+        'subscriptions',
+        'home',
+        'future-timeline',
+        'leftover-forecast',
+        'weekly-plan',
+      ]) {
         void queryClient.invalidateQueries({ queryKey: [key] });
       }
     },
+  });
+}
+
+export function useCardStatementQuery(accountId: string) {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['card-statement', accountId],
+    queryFn: () =>
+      apiFetch<CardStatementResponse>(`/future/statements/${accountId}`, {
+        accessToken: accessToken!,
+      }),
+    enabled: !!accessToken && !!accountId,
   });
 }
 
@@ -121,12 +144,56 @@ function invalidateAfterBillChange(queryClient: ReturnType<typeof useQueryClient
   }
 }
 
+/** A API recalcula comprometido e resumos num job logo depois de responder: invalida agora (nome,
+ * quitado) e de novo em instantes (totais). */
+function invalidateAfterInstallmentChange(queryClient: ReturnType<typeof useQueryClient>) {
+  const keys = [
+    'installments',
+    'home',
+    'future-timeline',
+    'leftover-forecast',
+    'card-statement',
+    'spending-summary',
+    'transactions',
+  ];
+  const run = () => keys.forEach((key) => void queryClient.invalidateQueries({ queryKey: [key] }));
+  run();
+  setTimeout(run, 4000);
+}
+
+export function useUpdateInstallmentMutation(id: string) {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: {
+      name?: string | null;
+      categoryId?: string | null;
+      settledEarly?: boolean;
+    }) =>
+      apiFetch<void>(`/future/installments/${id}`, {
+        method: 'PATCH',
+        accessToken: accessToken!,
+        body: JSON.stringify(patch),
+      }),
+    onSuccess: () => invalidateAfterInstallmentChange(queryClient),
+  });
+}
+
 export function useCreateFixedBillMutation() {
   const accessToken = useAccessToken();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (bill: { name: string; amountCents: number; day: number; paidWith: string | null }) =>
-      apiFetch<{ id: string }>('/future/bills', { method: 'POST', accessToken: accessToken!, body: JSON.stringify(bill) }),
+    mutationFn: (bill: {
+      name: string;
+      amountCents: number;
+      day: number;
+      paidWith: string | null;
+    }) =>
+      apiFetch<{ id: string }>('/future/bills', {
+        method: 'POST',
+        accessToken: accessToken!,
+        body: JSON.stringify(bill),
+      }),
     onSuccess: () => invalidateAfterBillChange(queryClient),
   });
 }
@@ -135,7 +202,8 @@ export function useDeleteFixedBillMutation() {
   const accessToken = useAccessToken();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => apiFetch<void>(`/future/bills/${id}`, { method: 'DELETE', accessToken: accessToken! }),
+    mutationFn: (id: string) =>
+      apiFetch<void>(`/future/bills/${id}`, { method: 'DELETE', accessToken: accessToken! }),
     onSuccess: () => invalidateAfterBillChange(queryClient),
   });
 }
@@ -144,7 +212,8 @@ export function useFutureTimelineQuery() {
   const accessToken = useAccessToken();
   return useQuery({
     queryKey: ['future-timeline'],
-    queryFn: () => apiFetch<FutureTimelineResponse>('/future/timeline', { accessToken: accessToken! }),
+    queryFn: () =>
+      apiFetch<FutureTimelineResponse>('/future/timeline', { accessToken: accessToken! }),
     enabled: !!accessToken,
   });
 }
@@ -190,7 +259,11 @@ export function useUpdateMeMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (patch: { name?: string; monthlyIncomeCents?: number; payday?: number }) =>
-      apiFetch<MeResponse>('/me', { method: 'PATCH', accessToken: accessToken!, body: JSON.stringify(patch) }),
+      apiFetch<MeResponse>('/me', {
+        method: 'PATCH',
+        accessToken: accessToken!,
+        body: JSON.stringify(patch),
+      }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['me'] });
       void queryClient.invalidateQueries({ queryKey: ['home'] });
@@ -213,7 +286,11 @@ export function useUpdateSettingsMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (patch: { hideValuesOnOpen?: boolean }) =>
-      apiFetch<SettingsResponse>('/settings', { method: 'PATCH', accessToken: accessToken!, body: JSON.stringify(patch) }),
+      apiFetch<SettingsResponse>('/settings', {
+        method: 'PATCH',
+        accessToken: accessToken!,
+        body: JSON.stringify(patch),
+      }),
     onSuccess: (updated) => {
       queryClient.setQueryData(['settings'], updated);
     },
@@ -243,7 +320,9 @@ export function useTransactionsQuery(filters: TransactionListFilters) {
   return useQuery({
     queryKey: ['transactions', filters],
     queryFn: () =>
-      apiFetch<TransactionListItem[]>(`/transactions${transactionListQueryString(filters)}`, { accessToken: accessToken! }),
+      apiFetch<TransactionListItem[]>(`/transactions${transactionListQueryString(filters)}`, {
+        accessToken: accessToken!,
+      }),
     enabled: !!accessToken,
   });
 }
@@ -252,7 +331,8 @@ export function useTransactionQuery(id: string) {
   const accessToken = useAccessToken();
   return useQuery({
     queryKey: ['transaction', id],
-    queryFn: () => apiFetch<TransactionDetailResponse>(`/transactions/${id}`, { accessToken: accessToken! }),
+    queryFn: () =>
+      apiFetch<TransactionDetailResponse>(`/transactions/${id}`, { accessToken: accessToken! }),
     enabled: !!accessToken,
   });
 }
@@ -261,7 +341,12 @@ export function useUpdateTransactionMutation(id: string) {
   const accessToken = useAccessToken();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (patch: { categoryId?: string; expenseKind?: 'fixed' | 'variable'; isHidden?: boolean; note?: string | null }) =>
+    mutationFn: (patch: {
+      categoryId?: string;
+      expenseKind?: 'fixed' | 'variable';
+      isHidden?: boolean;
+      note?: string | null;
+    }) =>
       apiFetch<TransactionDetailResponse>(`/transactions/${id}`, {
         method: 'PATCH',
         accessToken: accessToken!,
@@ -280,7 +365,10 @@ export function useCategoryDetailQuery(categoryId: string) {
   const accessToken = useAccessToken();
   return useQuery({
     queryKey: ['category-detail', categoryId],
-    queryFn: () => apiFetch<CategoryDetailResponse>(`/spending/category/${categoryId}`, { accessToken: accessToken! }),
+    queryFn: () =>
+      apiFetch<CategoryDetailResponse>(`/spending/category/${categoryId}`, {
+        accessToken: accessToken!,
+      }),
     enabled: !!accessToken && !!categoryId,
   });
 }
@@ -288,8 +376,17 @@ export function useCategoryDetailQuery(categoryId: string) {
 export function useCreateCategoryRuleMutation() {
   const accessToken = useAccessToken();
   return useMutation({
-    mutationFn: (body: { matchType: 'merchant' | 'keyword'; pattern: string; categoryId: string; expenseKind?: 'fixed' | 'variable' }) =>
-      apiFetch<{ id: string }>('/category-rules', { method: 'POST', accessToken: accessToken!, body: JSON.stringify(body) }),
+    mutationFn: (body: {
+      matchType: 'merchant' | 'keyword';
+      pattern: string;
+      categoryId: string;
+      expenseKind?: 'fixed' | 'variable';
+    }) =>
+      apiFetch<{ id: string }>('/category-rules', {
+        method: 'POST',
+        accessToken: accessToken!,
+        body: JSON.stringify(body),
+      }),
   });
 }
 
@@ -297,7 +394,17 @@ export function useImportOfxMutation() {
   const accessToken = useAccessToken();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ accountId, fileUri, fileName, mimeType }: { accountId: string; fileUri: string; fileName: string; mimeType: string }) => {
+    mutationFn: ({
+      accountId,
+      fileUri,
+      fileName,
+      mimeType,
+    }: {
+      accountId: string;
+      fileUri: string;
+      fileName: string;
+      mimeType: string;
+    }) => {
       const formData = new FormData();
       formData.append('accountId', accountId);
       // RN aceita esse shape de objeto no lugar de um Blob de verdade pra arquivo local (URI do
@@ -361,7 +468,10 @@ export function useDisconnectConnectionMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (connectionId: string) =>
-      apiFetch<void>(`/connections/${connectionId}`, { method: 'DELETE', accessToken: accessToken! }),
+      apiFetch<void>(`/connections/${connectionId}`, {
+        method: 'DELETE',
+        accessToken: accessToken!,
+      }),
     onSuccess: () => invalidateConnectionData(queryClient),
   });
 }
@@ -371,11 +481,14 @@ export function useSyncConnectionItemMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (itemId: string) =>
-      apiFetch<{ connectionId: string; accountsSynced: number; transactionsImported: number }>('/connections/sync-item', {
-        method: 'POST',
-        accessToken: accessToken!,
-        body: JSON.stringify({ itemId }),
-      }),
+      apiFetch<{ connectionId: string; accountsSynced: number; transactionsImported: number }>(
+        '/connections/sync-item',
+        {
+          method: 'POST',
+          accessToken: accessToken!,
+          body: JSON.stringify({ itemId }),
+        },
+      ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['connections'] });
       void queryClient.invalidateQueries({ queryKey: ['accounts'] });
