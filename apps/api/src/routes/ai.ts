@@ -136,10 +136,15 @@ export async function aiRoutes(app: FastifyInstance) {
       maxOutputTokens: MAX_OUTPUT_TOKENS,
     });
 
-    const send = (event: string, data: unknown) => reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    const send = (event: string, data: unknown) =>
+      reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     if (streaming) {
       reply.hijack();
-      reply.raw.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+      reply.raw.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      });
     }
 
     let text = '';
@@ -183,7 +188,9 @@ export async function aiRoutes(app: FastifyInstance) {
       if (previousCard && JSON.stringify(previousCard) === JSON.stringify(card)) card = null;
     }
 
-    await db.insert(aiMessages).values({ conversationId, role: 'user', content: body.data.message });
+    await db
+      .insert(aiMessages)
+      .values({ conversationId, role: 'user', content: body.data.message });
     const [saved] = await db
       .insert(aiMessages)
       .values({
@@ -260,6 +267,22 @@ export async function aiRoutes(app: FastifyInstance) {
       preview: previews.get(r.id)?.slice(0, 90) ?? null,
       lastMessageAt: new Date(r.lastMessageAt ?? r.createdAt).toISOString(),
     }));
+  });
+
+  // Excluir uma conversa do histórico (as mensagens vão junto, `on delete cascade`). Não devolve a
+  // pergunta pra cota: ela já foi respondida.
+  app.delete('/ai/conversations/:id', async (request, reply) => {
+    const userId = await requireUserId(request, reply);
+    if (!userId) return;
+    const { id } = request.params as { id: string };
+    if (!z.string().uuid().safeParse(id).success)
+      return reply.code(400).send({ error: 'invalid_id' });
+    const [deleted] = await db
+      .delete(aiConversations)
+      .where(and(eq(aiConversations.id, id), eq(aiConversations.userId, userId)))
+      .returning({ id: aiConversations.id });
+    if (!deleted) return reply.code(404).send({ error: 'conversation_not_found' });
+    return reply.code(204).send();
   });
 
   app.get('/ai/conversations/:id', async (request, reply) => {
