@@ -20,16 +20,8 @@ import { monthNamePtBR } from '@planor/shared';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { ChatMessage, ChatNotice, TypingMessage } from '@/features/ia/ChatMessage';
 import { ApiError } from '@/lib/api/client';
 import {
@@ -145,14 +137,25 @@ export default function IaScreen() {
       : activeBanks === 1
         ? 'Lendo seus dados de 1 banco'
         : `Lendo seus dados de ${activeBanks} bancos`;
+  // O campo de mensagem fica fixo acima da tab bar; com o teclado aberto, sobe junto com ele
+  // (KeyboardAvoidingView não move elemento com posição absoluta).
+  const keyboard = useAnimatedKeyboard();
+  const inputBarStyle = useAnimatedStyle(() => ({
+    bottom: Math.max(INPUT_BAR_BOTTOM, keyboard.height.value + KEYBOARD_GAP),
+  }));
+  const keyboardSpacerStyle = useAnimatedStyle(() => ({ height: keyboard.height.value }));
+  useEffect(() => {
+    const subscription = Keyboard.addListener('keyboardDidShow', () =>
+      scrollRef.current?.scrollToEnd({ animated: true }),
+    );
+    return () => subscription.remove();
+  }, []);
+
   const firstName = me?.name?.split(' ')[0];
   const inConversation = messages.length > 0 || isPending;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={styles.screen}>
       <View style={styles.glow} pointerEvents="none">
         <GlowOrb
           width={630}
@@ -254,9 +257,11 @@ export default function IaScreen() {
             )}
           </View>
         )}
+        {/* Com o teclado aberto, o fim da conversa fica acima dele. */}
+        <Animated.View style={keyboardSpacerStyle} />
       </ScrollView>
 
-      <View style={styles.inputBar}>
+      <Animated.View style={[styles.inputBar, inputBarStyle]}>
         <TextInput
           style={styles.input}
           value={draft}
@@ -282,10 +287,15 @@ export default function IaScreen() {
             <Icon name="enviar" size={18} color={colors.dark.text.primary} />
           </LinearGradient>
         </Pressable>
-      </View>
-    </KeyboardAvoidingView>
+      </Animated.View>
+    </View>
   );
 }
+
+/** Distância do campo de mensagem até a borda de baixo, acima da tab bar (Figma 33:726). */
+const INPUT_BAR_BOTTOM = 116;
+/** Espaço entre o campo e o teclado aberto. */
+const KEYBOARD_GAP = 12;
 
 function capitalizeFirst(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
@@ -404,7 +414,7 @@ const styles = StyleSheet.create({
   },
   inputBar: {
     position: 'absolute',
-    bottom: 116,
+    bottom: INPUT_BAR_BOTTOM,
     left: 16,
     right: 16,
     height: 56,
