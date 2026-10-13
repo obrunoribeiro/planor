@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth/AuthProvider';
+import { streamAiChat } from './aiStream';
 import { apiFetch, apiUpload } from './client';
 import type {
   AccountListItem,
@@ -7,11 +8,12 @@ import type {
   CategoryListItem,
   ConnectionListItem,
   FutureTimelineResponse,
-  AiChatResponse,
   AiConversationListItem,
   AiConversationResponse,
   AiUsage,
   AlertsResponse,
+  GoalDetail,
+  GoalItem,
   CardStatementResponse,
   FixedBillsResponse,
   HomeResponse,
@@ -121,14 +123,18 @@ export function useUpdateSubscriptionMutation(id: string) {
   });
 }
 
-export function useCardStatementQuery(accountId: string) {
+export function useCardStatementQuery(accountId: string, month?: string) {
   const accessToken = useAccessToken();
   return useQuery({
-    queryKey: ['card-statement', accountId],
+    queryKey: ['card-statement', accountId, month ?? 'a-pagar'],
     queryFn: () =>
-      apiFetch<CardStatementResponse>(`/future/statements/${accountId}`, {
-        accessToken: accessToken!,
-      }),
+      apiFetch<CardStatementResponse>(
+        `/future/statements/${accountId}${month ? `?month=${month}` : ''}`,
+        {
+          accessToken: accessToken!,
+        },
+      ),
+    placeholderData: (previous) => previous,
     enabled: !!accessToken && !!accountId,
   });
 }
@@ -213,13 +219,25 @@ export function useDeleteFixedBillMutation() {
   });
 }
 
-export function useFutureTimelineQuery() {
+export type CommitmentKind = 'installments' | 'subscriptions' | 'bills';
+export const ALL_COMMITMENT_KINDS: CommitmentKind[] = ['installments', 'subscriptions', 'bills'];
+
+/** "Filtrar compromissos" (Figma 49:1095): tipos e horizonte. Sem filtro, tudo em 6 meses. */
+export function useFutureTimelineQuery(
+  filter: { kinds: CommitmentKind[]; months: number } = { kinds: ALL_COMMITMENT_KINDS, months: 6 },
+) {
   const accessToken = useAccessToken();
+  const params = new URLSearchParams({
+    kinds: filter.kinds.join(','),
+    months: String(filter.months),
+  });
   return useQuery({
-    queryKey: ['future-timeline'],
+    // 'future-timeline' primeiro: as invalidações existentes continuam pegando todas as variações.
+    queryKey: ['future-timeline', filter.kinds.join(','), filter.months],
     queryFn: () =>
-      apiFetch<FutureTimelineResponse>('/future/timeline', { accessToken: accessToken! }),
+      apiFetch<FutureTimelineResponse>(`/future/timeline?${params}`, { accessToken: accessToken! }),
     enabled: !!accessToken,
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -558,19 +576,111 @@ export function useAiConversationQuery(id: string | undefined) {
   });
 }
 
+/** Pergunta à Planor IA com a resposta chegando aos pedaços (`onDelta`, SSE). */
 export function useAiChatMutation() {
   const accessToken = useAccessToken();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (input: { conversationId?: string; message: string }) =>
-      apiFetch<AiChatResponse>('/ai/chat', {
+    mutationFn: (input: {
+      conversationId?: string;
+      message: string;
+      onDelta: (text: string) => void;
+    }) => streamAiChat({ accessToken: accessToken!, ...input }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['ai-usage'], data.usage);
+      void queryClient.invalidateQueries({ queryKey: ['ai-conversations'] });
+      // A IA pode ter criado nada, mas o usuário pode ter tocado em "Criar" num cartão antes.
+      void queryClient.invalidateQueries({ queryKey: ['goals'] });
+    },
+  });
+}
+
+export function useGoalsQuery() {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['goals'],
+    queryFn: () => apiFetch<{ items: GoalItem[] }>('/goals', { accessToken: accessToken! }),
+    enabled: !!accessToken,
+  });
+}
+
+export function useGoalQuery(id: string) {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['goal', id],
+    queryFn: () => apiFetch<GoalDetail>(`/goals/${id}`, { accessToken: accessToken! }),
+    enabled: !!accessToken && !!id,
+  });
+}
+
+function invalidateGoals(queryClient: ReturnType<typeof useQueryClient>) {
+  void queryClient.invalidateQueries({ queryKey: ['goals'] });
+  void queryClient.invalidateQueries({ queryKey: ['goal'] });
+}
+
+export type CreateGoalInput =
+  | { type: 'savings'; name: string; targetCents: number; deadline?: string | null }
+  | {
+      type: 'category_limit';
+      categoryId: string;
+      targetCents: number;
+      alertAt80: boolean;
+      startNextMonth: boolean;
+    };
+
+export function useCreateGoalMutation() {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateGoalInput) =>
+      apiFetch<{ id: string }>('/goals', {
         method: 'POST',
         accessToken: accessToken!,
         body: JSON.stringify(input),
       }),
-    onSuccess: (data) => {
-      queryClient.setQueryData(['ai-usage'], data.usage);
-      void queryClient.invalidateQueries({ queryKey: ['ai-conversations'] });
-    },
+    onSuccess: () => invalidateGoals(queryClient),
+  });
+}
+
+export function useUpdateGoalMutation(id: string) {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: {
+      name?: string;
+      targetCents?: number;
+      deadline?: string | null;
+      alertAt80?: boolean;
+    }) =>
+      apiFetch<{ id: string }>(`/goals/${id}`, {
+        method: 'PATCH',
+        accessToken: accessToken!,
+        body: JSON.stringify(patch),
+      }),
+    onSuccess: () => invalidateGoals(queryClient),
+  });
+}
+
+export function useDeleteGoalMutation() {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<void>(`/goals/${id}`, { method: 'DELETE', accessToken: accessToken! }),
+    onSuccess: () => invalidateGoals(queryClient),
+  });
+}
+
+export function useAddContributionMutation(goalId: string) {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { amountCents: number; where: string | null }) =>
+      apiFetch<{ id: string }>(`/goals/${goalId}/contributions`, {
+        method: 'POST',
+        accessToken: accessToken!,
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => invalidateGoals(queryClient),
   });
 }

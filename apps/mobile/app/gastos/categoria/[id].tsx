@@ -1,18 +1,33 @@
 // Gastos · Categoria — CONTEXTO.md §6.5 ("total do mês, número de pedidos e ticket médio; gráfico
 // dos últimos 6 meses com a média; lista de transações"). Node 28:396 no Figma.
 //
-// Fora por enquanto (ver PROGRESSO.md): a "dica da IA" com "Criar limite" (IA e limites de
-// categoria são Fase 3) e o lápis de "Editar categoria" (sheet própria, ainda não existe).
-import { colors, EmptyState, gradients, Icon, radius, ScreenHeader, Skeleton, space, typography, useRevealProgress } from '@planor/ui';
+// Card do limite (§6.5): "Criar limite" abre o sheet (Figma 46:934); com limite, mostra como está
+// o mês e "Ajustar". Fora por enquanto (ver PROGRESSO.md): o texto da dica escrito pela IA e o
+// lápis de "Editar categoria" (sheet própria, ainda não existe).
+import {
+  colors,
+  EmptyState,
+  gradients,
+  Icon,
+  radius,
+  ScreenHeader,
+  Skeleton,
+  space,
+  typography,
+  useRevealProgress,
+} from '@planor/ui';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { Money } from '@/components/Money';
+import { CriarLimiteSheet } from '@/features/metas/CriarLimiteSheet';
+import { useMaskedMoneyText } from '@/lib/useMaskedMoneyText';
 import { ScreenGlow } from '@/components/ScreenGlow';
 import { categoryIcon } from '@/features/gastos/categoryIcons';
 import { TransactionRow } from '@/features/gastos/TransactionRow';
-import { useCategoryDetailQuery } from '@/lib/api/queries';
+import { useCategoryDetailQuery, useGoalsQuery } from '@/lib/api/queries';
 import { useHiddenValuesStore } from '@/lib/stores/useHiddenValuesStore';
 import { capitalize, dayTimeLabel, monthNamePtBR } from '@/lib/format';
 import { goBack } from '@/lib/navigation';
@@ -27,17 +42,27 @@ function Bar({ height, active }: { height: number; active: boolean }) {
   if (active) {
     return (
       <Animated.View ref={ref} collapsable={false} style={[styles.bar, styles.barClip, style]}>
-        <LinearGradient colors={gradients.icone.colors} start={gradients.icone.start} end={gradients.icone.end} style={StyleSheet.absoluteFill} />
+        <LinearGradient
+          colors={gradients.icone.colors}
+          start={gradients.icone.start}
+          end={gradients.icone.end}
+          style={StyleSheet.absoluteFill}
+        />
       </Animated.View>
     );
   }
-  return <Animated.View ref={ref} collapsable={false} style={[styles.bar, styles.barInactive, style]} />;
+  return (
+    <Animated.View ref={ref} collapsable={false} style={[styles.bar, styles.barInactive, style]} />
+  );
 }
 
 export default function CategoriaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data, isPending, isError, refetch } = useCategoryDetailQuery(id);
   const hidden = useHiddenValuesStore((state) => state.hidden);
+  const { data: goals } = useGoalsQuery();
+  const [limitVisible, setLimitVisible] = useState(false);
+  const mask = useMaskedMoneyText();
 
   if (isPending) {
     return (
@@ -54,14 +79,23 @@ export default function CategoriaScreen() {
   if (isError) {
     return (
       <View style={[styles.screen, styles.centered]}>
-        <EmptyState icon="aviso" title="Não deu pra carregar" text="Confira sua internet e tenta de novo." actionLabel="Tentar de novo" onAction={() => refetch()} />
+        <EmptyState
+          icon="aviso"
+          title="Não deu pra carregar"
+          text="Confira sua internet e tenta de novo."
+          actionLabel="Tentar de novo"
+          onAction={() => refetch()}
+        />
       </View>
     );
   }
 
   const maxAmount = Math.max(...data.months.map((m) => m.amountCents), 1);
   const countLabel = `${data.transactionsCount} ${data.transactionsCount === 1 ? 'compra' : 'compras'}`;
-  const averageTicket = data.averageTicketCents !== null ? ` · média de ${hidden ? 'R$ ••••' : formatCents(data.averageTicketCents)}` : '';
+  const averageTicket =
+    data.averageTicketCents !== null
+      ? ` · média de ${hidden ? 'R$ ••••' : formatCents(data.averageTicketCents)}`
+      : '';
 
   return (
     <View style={styles.screen}>
@@ -70,8 +104,17 @@ export default function CategoriaScreen() {
         <ScreenHeader title={data.category.name} onBack={() => goBack('/gastos')} />
 
         <View style={styles.summary}>
-          <LinearGradient colors={gradients.icone.colors} start={gradients.icone.start} end={gradients.icone.end} style={styles.iconTile}>
-            <Icon name={categoryIcon(data.category.name)} size={25.2} color={colors.dark.text.primary} />
+          <LinearGradient
+            colors={gradients.icone.colors}
+            start={gradients.icone.start}
+            end={gradients.icone.end}
+            style={styles.iconTile}
+          >
+            <Icon
+              name={categoryIcon(data.category.name)}
+              size={25.2}
+              color={colors.dark.text.primary}
+            />
           </LinearGradient>
           <Text style={styles.monthLabel}>Gasto em {monthNamePtBR(data.month)}</Text>
           <Money style={styles.total} cents={data.totalCents} />
@@ -85,7 +128,9 @@ export default function CategoriaScreen() {
           <View style={styles.cardTop}>
             <Text style={styles.cardTitle}>Últimos 6 meses</Text>
             {data.monthlyAverageCents !== null && (
-              <Text style={styles.caption}>Média {hidden ? 'R$ ••••' : formatCents(data.monthlyAverageCents)}</Text>
+              <Text style={styles.caption}>
+                Média {hidden ? 'R$ ••••' : formatCents(data.monthlyAverageCents)}
+              </Text>
             )}
           </View>
           <View style={styles.bars}>
@@ -93,7 +138,10 @@ export default function CategoriaScreen() {
               const active = i === data.months.length - 1;
               return (
                 <View key={m.month} style={styles.barColumn}>
-                  <Bar height={Math.max((m.amountCents / maxAmount) * MAX_BAR_HEIGHT, 4)} active={active} />
+                  <Bar
+                    height={Math.max((m.amountCents / maxAmount) * MAX_BAR_HEIGHT, 4)}
+                    active={active}
+                  />
                   <Text style={[styles.barLabel, active && styles.barLabelActive]}>{m.label}</Text>
                 </View>
               );
@@ -101,13 +149,70 @@ export default function CategoriaScreen() {
           </View>
         </View>
 
+        {(() => {
+          const limit = goals?.items.find(
+            (g) => g.type === 'category_limit' && g.categoryId === data.category.id,
+          );
+          return (
+            <LinearGradient
+              colors={gradients.dicaIa.colors}
+              start={gradients.dicaIa.start}
+              end={gradients.dicaIa.end}
+              style={styles.limitCard}
+            >
+              <Icon name="meta" size={20} color={colors.dark.text.brand} />
+              <View style={styles.limitTexts}>
+                <Text style={styles.limitTitle}>
+                  {limit ? (
+                    <>
+                      Limite de <Money cents={limit.targetCents} style={styles.limitTitle} /> por
+                      mês
+                    </>
+                  ) : (
+                    `Quer gastar menos com ${data.category.name.toLowerCase()}?`
+                  )}
+                </Text>
+                <Text style={styles.limitCaption}>
+                  {limit
+                    ? mask(limit.caption)
+                    : 'Ponha um limite por mês e eu aviso quando chegar perto.'}
+                </Text>
+              </View>
+              <Pressable
+                style={styles.limitButton}
+                onPress={() => setLimitVisible(true)}
+                accessibilityRole="button"
+              >
+                <Text style={styles.limitButtonLabel}>{limit ? 'Ajustar' : 'Criar limite'}</Text>
+              </Pressable>
+              <CriarLimiteSheet
+                visible={limitVisible}
+                onClose={() => setLimitVisible(false)}
+                categoryId={data.category.id}
+                categoryName={data.category.name}
+                monthKey={data.month}
+                spentThisMonthCents={data.totalCents}
+                monthlyAverageCents={data.monthlyAverageCents}
+                averageTicketCents={data.averageTicketCents}
+                current={
+                  limit ? { targetCents: limit.targetCents, alertAtPct: limit.alertAtPct } : null
+                }
+              />
+            </LinearGradient>
+          );
+        })()}
+
         <View style={styles.listTitleRow}>
           <Text style={styles.listTitle}>Transações</Text>
           <Text style={styles.listCount}>{data.transactionsCount}</Text>
         </View>
 
         {data.transactions.length === 0 ? (
-          <EmptyState icon="gastos" title="Nenhuma compra neste mês" text="Quando aparecer um gasto nessa categoria, ele entra aqui." />
+          <EmptyState
+            icon="gastos"
+            title="Nenhuma compra neste mês"
+            text="Quando aparecer um gasto nessa categoria, ele entra aqui."
+          />
         ) : (
           <View>
             {data.transactions.map((t) => (
@@ -129,9 +234,53 @@ export default function CategoriaScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.dark.bg.default },
   centered: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[24] },
-  content: { paddingTop: space[60], paddingHorizontal: space[24], paddingBottom: space[40], gap: space[20] },
+  content: {
+    paddingTop: space[60],
+    paddingHorizontal: space[24],
+    paddingBottom: space[40],
+    gap: space[20],
+  },
   summary: { alignItems: 'center', gap: space[6], paddingTop: space[8] },
-  iconTile: { width: 56, height: 56, borderRadius: 17.92, alignItems: 'center', justifyContent: 'center' },
+  limitCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[12],
+    padding: space[16],
+    borderRadius: radius['2xl'],
+  },
+  limitTexts: { flex: 1, gap: space[2] },
+  limitTitle: {
+    fontFamily: typography.labelMedium.fontFamily,
+    fontSize: typography.labelMedium.fontSize,
+    lineHeight: typography.labelMedium.lineHeight,
+    color: colors.dark.text.primary,
+  },
+  limitCaption: {
+    fontFamily: typography.caption.fontFamily,
+    fontSize: typography.caption.fontSize,
+    lineHeight: typography.caption.lineHeight,
+    letterSpacing: typography.caption.letterSpacing,
+    color: colors.dark.text.secondary,
+  },
+  limitButton: {
+    paddingHorizontal: space[14],
+    paddingVertical: space[8],
+    borderRadius: 18,
+    backgroundColor: colors.dark.bg.brand,
+  },
+  limitButtonLabel: {
+    fontFamily: typography.labelMedium.fontFamily,
+    fontSize: typography.labelMedium.fontSize,
+    lineHeight: typography.labelMedium.lineHeight,
+    color: colors.dark.text.onBrand,
+  },
+  iconTile: {
+    width: 56,
+    height: 56,
+    borderRadius: 17.92,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   monthLabel: {
     fontFamily: typography.bodyMedium.fontFamily,
     fontSize: typography.bodyMedium.fontSize,
@@ -167,7 +316,12 @@ const styles = StyleSheet.create({
     lineHeight: typography.labelMedium.lineHeight,
     color: colors.dark.text.primary,
   },
-  bars: { flexDirection: 'row', alignItems: 'flex-end', gap: space[10], height: MAX_BAR_HEIGHT + 22 },
+  bars: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: space[10],
+    height: MAX_BAR_HEIGHT + 22,
+  },
   barColumn: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: space[6] },
   bar: { width: '100%', borderRadius: radius.sm },
   barClip: { overflow: 'hidden' },

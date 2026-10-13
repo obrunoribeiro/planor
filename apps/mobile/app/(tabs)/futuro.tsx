@@ -1,5 +1,19 @@
 // Futuro · Linha do tempo — CONTEXTO.md §6.6. Node 30:459 no Figma.
-import { Badge, Chip, colors, EmptyState, gradients, GlowOrb, Icon, RevealScrollView, Skeleton, space, typography, useRevealProgress, type IconName } from '@planor/ui';
+import {
+  Badge,
+  Chip,
+  colors,
+  EmptyState,
+  gradients,
+  GlowOrb,
+  Icon,
+  RevealScrollView,
+  Skeleton,
+  space,
+  typography,
+  useRevealProgress,
+  type IconName,
+} from '@planor/ui';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -7,9 +21,20 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { Money } from '@/components/Money';
 import { capitalize, dueDayMonthLabel } from '@/lib/format';
-import { useFutureTimelineQuery } from '@/lib/api/queries';
+import { FiltrarCompromissosSheet } from '@/features/futuro/FiltrarCompromissosSheet';
+import {
+  ALL_COMMITMENT_KINDS,
+  useFutureTimelineQuery,
+  type CommitmentKind,
+} from '@/lib/api/queries';
 
-const FILTERS = ['Tudo', 'Parcelas', 'Assinaturas', 'Fixos'] as const;
+// Chips do topo: atalhos do filtro. "Tudo" = os três tipos; os outros, um tipo só.
+const FILTERS: { label: string; kinds: CommitmentKind[] }[] = [
+  { label: 'Tudo', kinds: ALL_COMMITMENT_KINDS },
+  { label: 'Parcelas', kinds: ['installments'] },
+  { label: 'Assinaturas', kinds: ['subscriptions'] },
+  { label: 'Fixos', kinds: ['bills'] },
+];
 
 const MAX_BAR_HEIGHT = 96;
 
@@ -20,11 +45,18 @@ function CommittedBar({ height, active }: { height: number; active: boolean }) {
   if (active) {
     return (
       <Animated.View ref={ref} collapsable={false} style={[styles.bar, styles.barClip, style]}>
-        <LinearGradient colors={gradients.progresso.colors} start={gradients.progresso.start} end={gradients.progresso.end} style={StyleSheet.absoluteFill} />
+        <LinearGradient
+          colors={gradients.progresso.colors}
+          start={gradients.progresso.start}
+          end={gradients.progresso.end}
+          style={StyleSheet.absoluteFill}
+        />
       </Animated.View>
     );
   }
-  return <Animated.View ref={ref} collapsable={false} style={[styles.bar, styles.barInactive, style]} />;
+  return (
+    <Animated.View ref={ref} collapsable={false} style={[styles.bar, styles.barInactive, style]} />
+  );
 }
 
 function CommittedRow({
@@ -43,7 +75,11 @@ function CommittedRow({
   onPress?: () => void;
 }) {
   return (
-    <Pressable style={[styles.row, last ? styles.rowNoBorder : null]} onPress={onPress} disabled={!onPress}>
+    <Pressable
+      style={[styles.row, last ? styles.rowNoBorder : null]}
+      onPress={onPress}
+      disabled={!onPress}
+    >
       <View style={styles.rowIcon}>
         <Icon name={icon} size={18} color="#C8C6FE" />
       </View>
@@ -58,8 +94,12 @@ function CommittedRow({
 }
 
 export default function FuturoScreen() {
-  const [activeFilter, setActiveFilter] = useState<(typeof FILTERS)[number]>('Tudo');
-  const { data, isPending, isError, refetch } = useFutureTimelineQuery();
+  const [kinds, setKinds] = useState<CommitmentKind[]>(ALL_COMMITMENT_KINDS);
+  const [horizon, setHorizon] = useState(6);
+  const [filterVisible, setFilterVisible] = useState(false);
+  const sameKinds = (a: CommitmentKind[], b: CommitmentKind[]) =>
+    a.length === b.length && a.every((k) => b.includes(k));
+  const { data, isPending, isError, refetch } = useFutureTimelineQuery({ kinds, months: horizon });
 
   const glowOrb = (
     <View style={styles.glow} pointerEvents="none">
@@ -112,20 +152,32 @@ export default function FuturoScreen() {
       <RevealScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topRow}>
           <Text style={styles.pageTitle}>Futuro</Text>
-          {/* TODO: abrir o sheet "Filtrar compromissos" quando existir. */}
-          <Pressable style={styles.iconButton} accessibilityLabel="Filtros">
+          <Pressable
+            style={styles.iconButton}
+            onPress={() => setFilterVisible(true)}
+            accessibilityLabel="Filtrar compromissos"
+          >
             <Icon name="filtro" size={20} color={colors.dark.text.primary} />
           </Pressable>
         </View>
 
         <View style={styles.filters}>
           {FILTERS.map((filter) => (
-            <Chip key={filter} label={filter} active={filter === activeFilter} onPress={() => setActiveFilter(filter)} />
+            <Chip
+              key={filter.label}
+              label={filter.label}
+              active={sameKinds(filter.kinds, kinds)}
+              onPress={() => setKinds(filter.kinds)}
+            />
           ))}
         </View>
 
         {committed.months.length === 0 ? (
-          <EmptyState icon="futuro" title="Nada comprometido ainda" text="Parcelas, assinaturas e fixos que você registrar aparecem aqui." />
+          <EmptyState
+            icon="futuro"
+            title="Nada comprometido ainda"
+            text="Parcelas, assinaturas e fixos que você registrar aparecem aqui."
+          />
         ) : (
           <LinearGradient
             colors={gradients.totalGastos.colors}
@@ -137,7 +189,9 @@ export default function FuturoScreen() {
             <View style={styles.committedHeader}>
               <Text style={styles.committedLabel}>Já comprometido até {committed.untilLabel}</Text>
               <Money cents={committed.totalCents} style={styles.committedAmount} />
-              <Text style={styles.committedHint}>Parcelas, assinaturas e gastos fixos que já vão cair na fatura.</Text>
+              <Text style={styles.committedHint}>
+                Parcelas, assinaturas e gastos fixos que já vão cair na fatura.
+              </Text>
             </View>
 
             <View style={styles.bars}>
@@ -146,7 +200,9 @@ export default function FuturoScreen() {
                 return (
                   <View key={month.label} style={styles.barColumn}>
                     <CommittedBar height={barHeight} active={month.active} />
-                    <Text style={[styles.barLabel, month.active ? styles.barLabelActive : null]}>{month.label}</Text>
+                    <Text style={[styles.barLabel, month.active ? styles.barLabelActive : null]}>
+                      {month.label}
+                    </Text>
                   </View>
                 );
               })}
@@ -162,28 +218,36 @@ export default function FuturoScreen() {
             </View>
 
             <View style={styles.monthCard}>
-              <CommittedRow
-                icon="parcelas"
-                title="Parcelas"
-                subtitle={`${currentMonth.installments.count} parcelamentos`}
-                amountCents={currentMonth.installments.amountCents}
-                onPress={() => router.push('/futuro/parcelas')}
-              />
-              <CommittedRow
-                icon="play"
-                title="Assinaturas"
-                subtitle={`${currentMonth.subscriptions.count} assinaturas`}
-                amountCents={currentMonth.subscriptions.amountCents}
-                onPress={() => router.push('/futuro/assinaturas')}
-              />
-              <CommittedRow
-                icon="repetir"
-                title="Fixos recorrentes"
-                subtitle={currentMonth.bills.description}
-                amountCents={currentMonth.bills.amountCents}
-                onPress={() => router.push('/futuro/fixos')}
-                last
-              />
+              {kinds.includes('installments') && (
+                <CommittedRow
+                  icon="parcelas"
+                  title="Parcelas"
+                  subtitle={`${currentMonth.installments.count} parcelamentos`}
+                  amountCents={currentMonth.installments.amountCents}
+                  onPress={() => router.push('/futuro/parcelas')}
+                  last={!kinds.includes('subscriptions') && !kinds.includes('bills')}
+                />
+              )}
+              {kinds.includes('subscriptions') && (
+                <CommittedRow
+                  icon="play"
+                  title="Assinaturas"
+                  subtitle={`${currentMonth.subscriptions.count} assinaturas`}
+                  amountCents={currentMonth.subscriptions.amountCents}
+                  onPress={() => router.push('/futuro/assinaturas')}
+                  last={!kinds.includes('bills')}
+                />
+              )}
+              {kinds.includes('bills') && (
+                <CommittedRow
+                  icon="repetir"
+                  title="Fixos recorrentes"
+                  subtitle={currentMonth.bills.description}
+                  amountCents={currentMonth.bills.amountCents}
+                  onPress={() => router.push('/futuro/fixos')}
+                  last
+                />
+              )}
             </View>
           </>
         )}
@@ -194,7 +258,12 @@ export default function FuturoScreen() {
               <Pressable
                 key={statement.accountId}
                 style={styles.statementCard}
-                onPress={() => router.push({ pathname: '/futuro/fatura/[id]', params: { id: statement.accountId } })}
+                onPress={() =>
+                  router.push({
+                    pathname: '/futuro/fatura/[id]',
+                    params: { id: statement.accountId },
+                  })
+                }
                 accessibilityRole="button"
               >
                 <Text style={styles.statementLabel}>Fatura {statement.bank}</Text>
@@ -216,11 +285,24 @@ export default function FuturoScreen() {
           </LinearGradient>
           <View style={styles.simulatorTexts}>
             <Text style={styles.simulatorTitle}>Posso comprar?</Text>
-            <Text style={styles.simulatorSubtitle}>Simule uma compra parcelada e veja o impacto nos próximos meses.</Text>
+            <Text style={styles.simulatorSubtitle}>
+              Simule uma compra parcelada e veja o impacto nos próximos meses.
+            </Text>
           </View>
           <Badge tone="alert" label="Em breve" />
         </View>
       </RevealScrollView>
+
+      <FiltrarCompromissosSheet
+        visible={filterVisible}
+        onClose={() => setFilterVisible(false)}
+        kinds={kinds}
+        months={horizon}
+        onApply={(filter) => {
+          setKinds(filter.kinds);
+          setHorizon(filter.months);
+        }}
+      />
     </View>
   );
 }
@@ -228,7 +310,12 @@ export default function FuturoScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.dark.bg.default },
   glow: { position: 'absolute', top: -160, left: -120 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[24] },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: space[24],
+  },
   skeletonScreen: { flex: 1, paddingTop: space[60], paddingHorizontal: space[24], gap: space[20] },
   content: {
     paddingTop: space[60],

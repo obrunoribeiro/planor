@@ -1,4 +1,14 @@
-import { date, integer, jsonb, pgTable, primaryKey, real, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  date,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  real,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { createdAt, goalTypeEnum, id } from './_shared';
 import { categories } from './categories';
 import { households } from './household';
@@ -24,6 +34,8 @@ export const goals = pgTable('goals', {
   categoryId: uuid('category_id').references(() => categories.id),
   /** Percentual (0–1) pra disparar `limit_80` (§6.9). */
   alertAtPct: real('alert_at_pct'),
+  /** Limite de categoria: mês em que começa a contar ("YYYY-MM"), §6.5 "começar no mês que vem". */
+  startsMonth: text('starts_month'),
   createdAt: createdAt(),
 });
 

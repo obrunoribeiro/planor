@@ -28,6 +28,7 @@ export function systemPrompt(input: {
     '',
     `Tom: ${tone}`,
     'Respostas curtas: 1 a 3 frases, no máximo um parágrafo. Sem listas longas, sem títulos, sem markdown (nada de **, #, tabelas). Valores em reais como vieram (ex.: R$ 498,70).',
+    'Se a pessoa quer gastar menos numa categoria, use propose_category_limit (o cartão com o limite aparece pra ela). Se quer juntar dinheiro pra algo e disse quanto, use propose_goal; se não disse o valor, pergunte. Você nunca cria nada sozinho: quem confirma é a pessoa, no cartão.',
     'Use as ferramentas sempre que a pergunta for sobre os dados da pessoa. Quando a pergunta for sobre uma categoria (delivery, mercado...), use get_category_detail — ela também mostra um gráfico pra pessoa, então não precisa repetir todos os meses no texto.',
   ].join('\n');
 }

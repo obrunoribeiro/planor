@@ -15,7 +15,8 @@
     "react": "*",
     "react-native": "*",
     "react-native-reanimated": "*",
-    "react-native-svg": "*"
+    "react-native-svg": "*",
+    "react-native-gesture-handler": "*"
   },
   "devDependencies": {
     "@planor/config": "workspace:*",

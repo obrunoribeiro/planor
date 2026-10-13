@@ -15,6 +15,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Money } from '@/components/Money';
+import { ProposalCard } from '@/features/ia/ProposalCard';
 import type { AiCategoryCard, AiMessage } from '@/lib/api/types';
 import { useMaskedMoneyText } from '@/lib/useMaskedMoneyText';
 
@@ -118,7 +119,10 @@ export function ChatMessage({ message }: { message: AiMessage }) {
         <View style={styles.assistantBubble}>
           <Text style={styles.text}>{mask(message.content)}</Text>
         </View>
-        {message.card && <CategoryCard card={message.card} />}
+        {message.card?.type === 'category' && <CategoryCard card={message.card} />}
+        {(message.card?.type === 'limit_proposal' || message.card?.type === 'goal_proposal') && (
+          <ProposalCard card={message.card} />
+        )}
       </View>
     </View>
   );

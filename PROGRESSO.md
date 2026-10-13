@@ -423,6 +423,44 @@ protótipo do Figma.
   compras) ficou em Lazer, confirmado pelo Bruno. No primeiro teste, antes do
   `looksLikePersonName`, ~13 nomes de pessoa que vendem na maquininha foram enviados uma vez; as
   respostas deles foram apagadas do cache e não são mais enviados.
+- **Planor IA com streaming (SSE)** — `POST /ai/chat?stream=1` manda o texto aos pedaços
+  (`delta`) e termina com `done` (mesmo corpo da resposta sem stream). No app, `src/lib/api/aiStream.ts`
+  lê com o `fetch` do `expo/fetch` (o do React Native não lê o corpo aos poucos); o balão vai
+  enchendo e o "digitando" aparece só enquanto a IA consulta os dados. Como o modelo escreve mais
+  rápido do que se lê (no teste do Bruno a resposta apareceu "de uma vez"), o texto recebido entra
+  na tela num ritmo de digitação (~60 caracteres/s, acelera em resposta longa) e o cartão só aparece
+  no fim. Usa o `fullStream` do AI SDK
+  (o `textStream` engole erro do provedor). O olho também esconde valor pela metade no fim do
+  texto ("R$ 1.720,").
+- **Cobrança duplicada de assinatura (§6.3, passo 5)** — alerta novo
+  `subscription_duplicate_charge` (registrado no CONTEXTO §6.9): a mesma assinatura cobrou valor
+  parecido (±5%) duas vezes em até 7 dias (`duplicateCharges` em packages/shared, com teste),
+  olhando os últimos 35 dias. Nenhuma duplicada nos dados do Bruno.
+- **"Filtrar compromissos" no Futuro (Figma 49:1095)** — o botão de filtro e os chips Tudo /
+  Parcelas / Assinaturas / Fixos (que antes não filtravam nada) agora filtram de verdade: o card
+  "Já comprometido", as barras e o bloco do mês. Sheet com "Mostrar" e "Até" 3, 6 ou 12 meses.
+  `GET /future/timeline?kinds=&months=`; `committed_by_month` passou a guardar 12 meses (era 6).
+- **Fatura do cartão: trocar de mês** — chips de mês no topo (até 6 fechadas, a aberta e as futuras
+  com parcela); a resposta traz `availableMonths`.
+- **Metas e limites de categoria (§6.8, §6.5)** — telas `app/ia/metas.tsx` (Figma 51:1177) e
+  `app/ia/meta/[id].tsx` (51:1249), sheets "Nova meta"/editar (51:1322), "Registrar valor
+  guardado" (51:1295) e "Criar limite" (46:934, com o componente novo `Slider` em `@planor/ui`).
+  Metas abre por um botão novo no topo da Planor IA; "Criar limite"/"Ajustar" fica num card na
+  tela da categoria em Gastos. API: `GET/POST /goals`, `GET/PATCH/DELETE /goals/:id`,
+  `POST /goals/:id/contributions` (eram stub); `goals.starts_month` (migração
+  `0011_ambitious_hardball.sql`, já aplicada) pro "começar no mês que vem". Regras puras em
+  `packages/shared/src/calculations/goals.ts` (com teste): ritmo por mês/semana até o prazo, mês
+  em que completa no ritmo atual, situação do limite, textos dos cards — os números do Figma
+  batem (R$ 4.000 em 12 meses = R$ 333,33; R$ 2.550 em 2 meses = R$ 1.275,00). Alertas novos
+  `limit_80` e `limit_exceeded` (uma vez por mês cada), testados com um limite de teste no Lazer
+  da conta do Bruno e apagados depois.
+- **Planor IA propõe limite e meta (Figma 33:711)** — ferramentas `get_goals`,
+  `propose_category_limit` e `propose_goal`. A IA nunca cria nada: mostra o cartão com "Criar
+  limite/meta" e "Ajustar valor", e quem confirma é o usuário. O valor do limite sai do backend
+  (80% da média mensal, arredondado de R$ 10 em R$ 10, entre R$ 100 e R$ 500); o da meta é o que a
+  pessoa disse (sem valor, a IA pergunta), e o "por mês" do cartão é calculado no app. Testado na
+  conta do Bruno: "gastar menos com mercado" → limite de R$ 130,00 (média R$ 166,88); "juntar 5 mil
+  em 10 meses" → cartão da meta; "começar uma reserva" → perguntou o valor.
 - **Planor IA — chat de verdade (§6.7, Figma 33:556, 33:643, 50:1127)** — a aba IA deixou de ser
   mock: sugestões e campo mandam a pergunta, conversa com balões, "digitando", cartão de dados com
   o gráfico da categoria (33:674) e histórico de conversas (`app/ia/historico.tsx`, com a cota do
@@ -465,27 +503,28 @@ protótipo do Figma.
   conta do Bruno e desfeito: quitar o PagTesouro tirou R$ 29,12 de cada mês até abril.
 
 **Falta:**
-- Assinaturas: "cobrança duplicada" (§6.3, passo 5) ainda não é detectada.
 - Alertas: push (§9, `push-dispatcher`; precisa da conta paga de desenvolvedor da Apple) e
   preferências por tipo/horário silencioso; tipos do §6.9 ainda não gerados (`charge_upcoming`,
   `subscription_new`, `installment_new`, `limit_80`/`limit_exceeded`, `weekly_plan_ready`,
   `monthly_recap_ready`, `household_*`, `social_*`, `trial_ending`). O ícone `cadeado` do
   registry tem o desenho de uma estrela — conferir no Figma. Os 3 alertas fictícios do seed
   foram apagados da conta do Bruno (2026-10-12, com o OK dele). Plano da semana: faltam os itens que dependem de metas e dos objetivos do onboarding.
-- Parcelas: o filtro do topo ("Filtrar compromissos", 49:1095). "Avisar antes da última parcela"
+- Parcelas: "Avisar antes da última parcela"
   (do sheet de editar) espera o push (§6.9).
-- Fixos: editar uma conta cadastrada à mão (hoje só remove). Fatura do cartão: trocar de mês
-  (a rota já aceita `?month=`, a tela ainda não tem seletor).
+- Fixos: editar uma conta cadastrada à mão (hoje só remove). "Filtrar compromissos": a parte
+  "Cartões e contas" (assinaturas e fixos ainda não guardam em qual cartão/conta caem).
 - Assinaturas: "Me lembrar 3 dias antes da cobrança" (Figma 49:1269) e o lembrete de 30 dias do
   "Uso pouco" esperam o push (§6.9) — sem ele, "Lembrete criado" seria mentira. O alerta de
   cobrança depois do cancelamento só aparece no contador do sino (a central de alertas ainda não
   existe).
 - Passo 6 (fixo/variável pela recorrência).
-- Planor IA: resposta em streaming (SSE), voz (microfone, "Ouvindo" 50:1334), cards de ação
-  ("Criar meta"/"Ajustar valor" — dependem de limites por categoria e metas, §6.5/§6.8),
-  `simulate_purchase` (v2), `create_category_limit`/`create_goal`/`get_goals`, o sheet "Limite de
-  perguntas" com o Pro (51:1359, depende do RevenueCat), classificador de intenção e cache de
-  prompt.
+- Planor IA: voz (microfone, "Ouvindo" 50:1334),
+  `simulate_purchase` (v2), o sheet "Limite de perguntas" com o Pro (51:1359, depende do
+  RevenueCat), "Meta criada" (33:755), classificador de intenção e cache de prompt.
+- Metas: seção "Em grupo" e metas da casa (Fase 5), estado vazio do Figma (82:2118 — hoje usa o
+  `EmptyState` padrão), "Limite criado" (46:972), escolher ícone da meta, item de meta no plano da
+  semana. As 4 metas fictícias do seed (com 6 depósitos e os participantes da meta em grupo) foram
+  apagadas da conta do Bruno em 2026-10-12, com o OK dele.
 - "Atualizar agora" leva ~1 min na conta do Bruno (1.135 transações): a sincronização grava uma
   transação por vez. Dá pra fazer em lote.
 
@@ -528,9 +567,7 @@ protótipo do Figma.
   aberta). A aberta continua calculada em `credit_cards.current_bill_cents`. O card do Futuro, o
   plano da semana e a tela da fatura mostram "a fatura a pagar": a fechada enquanto falta pagar
   (mesmo atrasada), depois a aberta.
-- **Planor IA, primeira versão diferente do §6.7/§8:** resposta inteira (sem streaming SSE) — o
-  `fetch` do React Native não lê stream sem `expo/fetch`, e dá pra trocar depois sem mudar a tela;
-  um modelo só (Sonnet), sem o classificador de intenção barato (com 8 ferramentas o próprio
+- **Planor IA diferente do §6.7:** um modelo só (Sonnet), sem o classificador de intenção barato (com 8 ferramentas o próprio
   modelo escolhe bem, e um classificador seria outra chamada por pergunta); sem cache de prompt (o
   prompt de sistema tem menos que o mínimo de tokens que a Anthropic cacheia). Sugestão "Posso
   parcelar um celular?" saiu do início (simular compra é v2) e entraram "Quanto vai sobrar este
@@ -544,6 +581,11 @@ protótipo do Figma.
   ritmo da categoria só vale pra categorias variáveis com média de pelo menos R$ 100 (uma parcela
   de R$ 46 sozinha já passava dos 80%). Os dois tipos usam `unusual_spend`, com `payload.kind`
   `purchase` ou `category`.
+- **Metas liberadas no plano Grátis** — a tabela de planos do CONTEXTO põe "metas e plano personalizados" no Pro, mas
+  sem o RevenueCat não há como assinar; o bloqueio entra junto com a assinatura.
+- **Metas abre pela Planor IA** — o §5 põe `ia/metas` dentro da IA, mas nenhuma tela do Figma
+  tem o caminho até lá (a aba Metas é v2). Ficou um botão com o ícone de meta no topo da IA, ao
+  lado do histórico. O card de limite na categoria usa um texto fixo, não a "dica da IA".
 - **"Importantes" na central** = gasto fora do padrão, assinatura mais cara, cobrança depois do
   cancelamento e problemas de conexão (o CONTEXTO lista o chip, mas não diz quais tipos).
 - **"Editar parcelamento" sem "Avisar antes da última parcela"** — sem push (§6.9) o aviso não

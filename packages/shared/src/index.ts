@@ -6,6 +6,7 @@ export * from './calculations/projectedLeftover';
 export * from './calculations/householdSettlement';
 export * from './calculations/creditCardBill';
 export * from './calculations/alerts';
+export * from './calculations/goals';
 export * from './calculations/committedByMonth';
 export * from './calculations/dueUntilMonthEnd';
 export * from './calculations/weeklyPlan';

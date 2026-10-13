@@ -215,7 +215,7 @@ async function recomputeMonthlySummaries(userId: string): Promise<{ months: numb
   return { months: summaries.length };
 }
 
-const COMMITTED_HORIZON_MONTHS = 6; // o Futuro mostra os próximos 6 meses (§6.6)
+const COMMITTED_HORIZON_MONTHS = 12; // o Futuro mostra 6 meses e filtra até 12 (§6.6, Figma 49:1095)
 
 /** Mesma identidade que o passo 4 usa pra agrupar parcelas (sem o valor, que varia 1 centavo). */
 function planKey(plan: {

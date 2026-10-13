@@ -202,6 +202,8 @@ export type CardStatementResponse = {
   bank: string;
   /** Mês do vencimento, "YYYY-MM". */
   month: string;
+  /** Meses com fatura pra navegar (fechadas recentes, a aberta e futuras com parcela), em ordem. */
+  availableMonths: string[];
   /** `closed` = já fechou; `open` = ainda recebe compras; `future` = só parcelas já lançadas. */
   kind: 'closed' | 'open' | 'future';
   paid: boolean;
@@ -366,11 +368,31 @@ export type AiCategoryCard = {
   months: { label: string; amountCents: number; active: boolean }[];
 };
 
+/** Proposta de limite (Figma 33:711). Valor calculado no backend. */
+export type AiLimitProposalCard = {
+  type: 'limit_proposal';
+  categoryId: string;
+  categoryName: string;
+  targetCents: number;
+  monthlyAverageCents: number | null;
+  averageTicketCents: number | null;
+};
+
+/** Proposta de meta com o que o usuário disse. */
+export type AiGoalProposalCard = {
+  type: 'goal_proposal';
+  name: string;
+  targetCents: number;
+  months: number | null;
+};
+
+export type AiCard = AiCategoryCard | AiLimitProposalCard | AiGoalProposalCard;
+
 export type AiMessage = {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  card: AiCategoryCard | null;
+  card: AiCard | null;
   createdAt: string;
 };
 
@@ -387,3 +409,32 @@ export type AiConversationListItem = {
 };
 
 export type AiConversationResponse = { id: string; title: string; messages: AiMessage[] };
+
+/** `GET /goals` — metas e limites de categoria (§6.8, §6.5). Textos já prontos da API. */
+export type GoalItem = {
+  id: string;
+  type: 'savings' | 'category_limit';
+  name: string;
+  icon: string | null;
+  targetCents: number;
+  /** Guardado (meta) ou gasto no mês (limite). */
+  currentCents: number;
+  categoryId: string | null;
+  categoryName: string | null;
+  /** "YYYY-MM-DD". */
+  deadline: string | null;
+  /** "YYYY-MM". */
+  startsMonth: string | null;
+  alertAtPct: number | null;
+  status: 'ok' | 'done' | 'not_started' | 'warning' | 'exceeded';
+  caption: string;
+  suggestedPace: string | null;
+  suggestedContributionCents: number | null;
+  /** Já guardado (ou gasto, no limite) sobre o alvo, 0–100 (o limite pode passar de 100). */
+  percent: number;
+};
+
+export type GoalDetail = GoalItem & {
+  contributions: { id: string; amountCents: number; where: string | null; createdAt: string }[];
+  whereOptions: string[];
+};

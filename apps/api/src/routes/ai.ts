@@ -2,17 +2,17 @@
 // A IA nunca faz conta: as ferramentas (src/ai/tools.ts) chamam as mesmas rotas que as telas usam
 // e devolvem números prontos; o modelo só escreve o texto (CLAUDE.md, princípio 2).
 //
-// Diferente do §6.7/§8, por enquanto (ver PROGRESSO.md): resposta inteira, sem streaming (SSE);
-// um modelo só (Sonnet), sem o classificador de intenção; sem cache de prompt (o prompt de sistema
+// Streaming SSE com `?stream=1` (§8). Diferente do §6.7, por enquanto (ver PROGRESSO.md): um
+// modelo só (Sonnet), sem o classificador de intenção; sem cache de prompt (o prompt de sistema
 // ainda é menor que o mínimo de cache da Anthropic).
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { generateText, stepCountIs, type ModelMessage } from 'ai';
+import { stepCountIs, streamText, type ModelMessage } from 'ai';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { aiConversations, aiMessages, aiUsage, users } from '@planor/db';
 import { monthKeySaoPaulo } from '@planor/shared';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
-import { buildTools, makeFetcher, type CategoryCard } from '../ai/tools';
+import { buildTools, makeFetcher, type ChatCard } from '../ai/tools';
 import { systemPrompt } from '../ai/prompt';
 import { env } from '../env';
 import { requireUserId } from '../lib/auth';
@@ -26,7 +26,7 @@ const HISTORY_MESSAGES = 12;
 const MAX_STEPS = 6;
 const MAX_OUTPUT_TOKENS = 700;
 
-type StoredExtras = { card?: CategoryCard | null; tools?: string[] };
+type StoredExtras = { card?: ChatCard | null; tools?: string[] };
 
 async function usageFor(userId: string, plan: string, month: string) {
   const [row] = await db
@@ -111,38 +111,66 @@ export async function aiRoutes(app: FastifyInstance) {
       { role: 'user', content: body.data.message },
     ];
 
-    let card: CategoryCard | null = null;
+    let card: ChatCard | null = null;
+    // Um cartão por resposta: uma proposta (limite/meta) vale mais que o gráfico de contexto.
     const tools = buildTools(makeFetcher(app, request.headers.authorization!), (c) => {
+      const current = card as ChatCard | null;
+      if (c.type === 'category' && current && current.type !== 'category') return;
       card = c;
     });
 
-    let text: string;
+    // Streaming (SSE) quando o app pede `?stream=1`: o texto chega em pedaços (`delta`) e, no fim,
+    // um `done` com a mensagem salva, o cartão e a cota — o mesmo corpo da resposta sem stream.
+    const streaming = (request.query as { stream?: string }).stream === '1';
+    const result = streamText({
+      model: createAnthropic({ apiKey: env.ANTHROPIC_API_KEY })(AI_CHAT_MODEL),
+      system: systemPrompt({
+        name: user?.name?.split(' ')[0] ?? null, // só o primeiro nome (§10: o mínimo de dado pessoal)
+        todayLabel: todayLabel(now),
+        currentMonth: month,
+        feelingScore: user?.feelingScore ?? null,
+      }),
+      messages,
+      tools,
+      stopWhen: stepCountIs(MAX_STEPS),
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
+    });
+
+    const send = (event: string, data: unknown) => reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    if (streaming) {
+      reply.hijack();
+      reply.raw.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+    }
+
+    let text = '';
     let toolNames: string[];
     let tokens: number;
     try {
-      const result = await generateText({
-        model: createAnthropic({ apiKey: env.ANTHROPIC_API_KEY })(AI_CHAT_MODEL),
-        system: systemPrompt({
-          name: user?.name?.split(' ')[0] ?? null, // só o primeiro nome (§10: o mínimo de dado pessoal)
-          todayLabel: todayLabel(now),
-          currentMonth: month,
-          feelingScore: user?.feelingScore ?? null,
-        }),
-        messages,
-        tools,
-        stopWhen: stepCountIs(MAX_STEPS),
-        maxOutputTokens: MAX_OUTPUT_TOKENS,
-      });
-      text = result.text.trim();
-      toolNames = result.steps.flatMap((s) => s.toolCalls.map((c) => c.toolName));
-      tokens = (result.totalUsage.inputTokens ?? 0) + (result.totalUsage.outputTokens ?? 0);
+      // `fullStream`, não `textStream`: o `textStream` engole erro do provedor (chave vencida, sem
+      // crédito) e terminaria vazio.
+      for await (const part of result.fullStream) {
+        if (part.type === 'error') throw part.error;
+        if (part.type !== 'text-delta') continue;
+        text += part.text;
+        if (streaming) send('delta', { text: part.text });
+      }
+      const steps = await result.steps;
+      const usageTotals = await result.totalUsage;
+      toolNames = steps.flatMap((s) => s.toolCalls.map((c) => c.toolName));
+      tokens = (usageTotals.inputTokens ?? 0) + (usageTotals.outputTokens ?? 0);
     } catch (err) {
       request.log.error({ err }, 'Planor IA: falha ao chamar o modelo');
+      if (streaming) {
+        send('error', { error: 'ai_unavailable', conversationId });
+        reply.raw.end();
+        return;
+      }
       return reply.code(503).send({ error: 'ai_unavailable', conversationId });
     }
+    text = text.trim();
     if (!text) text = 'Não consegui montar uma resposta agora. Tenta perguntar de outro jeito?';
 
-    // O mesmo gráfico da resposta anterior (pergunta de seguimento sobre a mesma categoria) não
+    // O mesmo cartão da resposta anterior (pergunta de seguimento sobre a mesma coisa) não
     // aparece de novo.
     if (card && history.length > 0) {
       const [previous] = await db
@@ -152,18 +180,10 @@ export async function aiRoutes(app: FastifyInstance) {
         .orderBy(desc(aiMessages.createdAt))
         .limit(1);
       const previousCard = (previous?.toolCalls as StoredExtras | null)?.card;
-      const current = card as CategoryCard;
-      if (
-        previousCard &&
-        previousCard.title === current.title &&
-        previousCard.totalCents === current.totalCents
-      )
-        card = null;
+      if (previousCard && JSON.stringify(previousCard) === JSON.stringify(card)) card = null;
     }
 
-    await db
-      .insert(aiMessages)
-      .values({ conversationId, role: 'user', content: body.data.message });
+    await db.insert(aiMessages).values({ conversationId, role: 'user', content: body.data.message });
     const [saved] = await db
       .insert(aiMessages)
       .values({
@@ -182,7 +202,7 @@ export async function aiRoutes(app: FastifyInstance) {
         set: { questionsCount: sql`${aiUsage.questionsCount} + 1` },
       });
 
-    return {
+    const response = {
       conversationId,
       message: {
         id: saved!.id,
@@ -193,6 +213,12 @@ export async function aiRoutes(app: FastifyInstance) {
       },
       usage: { ...usage, used: usage.used + 1 },
     };
+    if (streaming) {
+      send('done', response);
+      reply.raw.end();
+      return;
+    }
+    return response;
   });
 
   app.get('/ai/conversations', async (request, reply) => {

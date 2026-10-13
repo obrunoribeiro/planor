@@ -26,6 +26,31 @@ export type CategoryCard = {
   months: { label: string; amountCents: number; active: boolean }[];
 };
 
+/** Proposta de limite (Figma 33:711): o valor sai do backend (80% da média), nunca do modelo. */
+export type LimitProposalCard = {
+  type: 'limit_proposal';
+  categoryId: string;
+  categoryName: string;
+  targetCents: number;
+  monthlyAverageCents: number | null;
+  averageTicketCents: number | null;
+};
+
+/** Proposta de meta: nome, valor e prazo que o usuário disse — o app só cria se ele tocar. */
+export type GoalProposalCard = {
+  type: 'goal_proposal';
+  name: string;
+  targetCents: number;
+  months: number | null;
+};
+
+export type ChatCard = CategoryCard | LimitProposalCard | GoalProposalCard;
+
+/** Faixa do slider de limite (§6.5: R$ 100 a R$ 500) e o passo dele. */
+const LIMIT_MIN_CENTS = 10_000;
+const LIMIT_MAX_CENTS = 50_000;
+const LIMIT_STEP_CENTS = 1_000;
+
 type Fetcher = <T>(url: string) => Promise<T | null>;
 
 export function makeFetcher(app: FastifyInstance, authorization: string): Fetcher {
@@ -67,7 +92,7 @@ type TransactionRow = {
   categoryName: string | null;
 };
 
-export function buildTools(fetch: Fetcher, onCard: (card: CategoryCard) => void) {
+export function buildTools(fetch: Fetcher, onCard: (card: ChatCard) => void) {
   return {
     get_spending_by_category: tool({
       description:
@@ -310,6 +335,102 @@ export function buildTools(fetch: Fetcher, onCard: (card: CategoryCard) => void)
           aindaVaiCair: money(data.due.totalCents),
           sobraPrevista:
             data.projectedLeftoverCents === null ? null : money(data.projectedLeftoverCents),
+        };
+      },
+    }),
+
+    get_goals: tool({
+      description:
+        'Metas do usuário (guardar dinheiro) e limites de categoria, com quanto já foi guardado ou gasto no mês.',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const data = await fetch<{
+          items: {
+            name: string;
+            type: string;
+            currentCents: number;
+            targetCents: number;
+            percent: number;
+            caption: string;
+          }[];
+        }>('/goals');
+        if (!data) return { error: 'Sem dados de metas.' };
+        return {
+          metas: data.items.map((g) => ({
+            nome: g.name,
+            tipo: g.type === 'category_limit' ? 'limite de categoria por mês' : 'guardar dinheiro',
+            atual: money(g.currentCents),
+            alvo: money(g.targetCents),
+            percentual: `${g.percent}%`,
+            situacao: g.caption.replace(/\u00a0/g, ' '),
+          })),
+        };
+      },
+    }),
+
+    propose_category_limit: tool({
+      description:
+        'Propõe um limite mensal pra uma categoria (ex.: "me ajuda a gastar menos com delivery"). Mostra um cartão com "Criar limite" e "Ajustar valor"; NÃO cria nada — o usuário confirma no cartão. O valor é calculado aqui (80% da média mensal, entre R$ 100 e R$ 500).',
+      inputSchema: z.object({ categoryName: z.string() }),
+      execute: async ({ categoryName }) => {
+        const categories = await fetch<{ id: string; name: string }[]>('/categories');
+        const normalize = (s: string) =>
+          s
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .trim();
+        const category = categories?.find((c) => normalize(c.name) === normalize(categoryName));
+        if (!category) return { error: `Não existe a categoria "${categoryName}".` };
+        const data = await fetch<CategoryDetail>(`/spending/category/${category.id}`);
+        const average = data?.monthlyAverageCents ?? null;
+        const suggested = average
+          ? Math.round((average * 0.8) / LIMIT_STEP_CENTS) * LIMIT_STEP_CENTS
+          : 30_000;
+        const targetCents = Math.min(LIMIT_MAX_CENTS, Math.max(LIMIT_MIN_CENTS, suggested));
+        onCard({
+          type: 'limit_proposal',
+          categoryId: category.id,
+          categoryName: category.name,
+          targetCents,
+          monthlyAverageCents: average,
+          averageTicketCents: data?.averageTicketCents ?? null,
+        });
+        return {
+          cartaoMostrado: true,
+          categoria: category.name,
+          limiteProposto: money(targetCents),
+          mediaMensal: average === null ? null : money(average),
+          observacao:
+            'O cartão com "Criar limite" e "Ajustar valor" já aparece pra pessoa. Explique em uma frase, sem repetir botões.',
+        };
+      },
+    }),
+
+    propose_goal: tool({
+      description:
+        'Propõe uma meta de guardar dinheiro com o nome, o valor e o prazo que a PESSOA disse. Mostra um cartão com "Criar meta" e "Ajustar valor"; NÃO cria nada. Não invente valor nem prazo: se a pessoa não disse o valor, pergunte antes.',
+      inputSchema: z.object({
+        name: z.string().min(1).max(60),
+        targetReais: z.number().positive().describe('Valor que a pessoa disse, em reais.'),
+        months: z
+          .number()
+          .int()
+          .positive()
+          .max(120)
+          .nullable()
+          .describe('Prazo em meses que a pessoa disse, ou null.'),
+      }),
+      execute: async ({ name, targetReais, months }) => {
+        const targetCents = Math.round(targetReais * 100);
+        onCard({ type: 'goal_proposal', name, targetCents, months });
+        return {
+          cartaoMostrado: true,
+          meta: name,
+          valor: money(targetCents),
+          prazo: months ? `${months} meses` : 'sem prazo',
+          observacao:
+            'O cartão já aparece pra pessoa, com o valor por mês calculado pelo app. Não calcule o valor por mês.',
         };
       },
     }),
