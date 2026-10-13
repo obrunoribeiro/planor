@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { categoriesAheadOfPace, describeAlert, unusualPurchases } from './alerts';
+import { categoriesAheadOfPace, describeAlert, duplicateCharges, unusualPurchases } from './alerts';
 
 const plain = (text: string) => text.replace(/\u00a0/g, ' ');
 
@@ -156,5 +156,36 @@ describe('describeAlert', () => {
 
   it('tipo desconhecido não quebra', () => {
     expect(describeAlert('algo_novo', {})).toMatchObject({ title: 'Aviso', route: null });
+  });
+});
+
+describe('duplicateCharges', () => {
+  const at = (day: number) => new Date(Date.UTC(2026, 9, day, 12));
+  it('mesma assinatura, mesmo valor, em até 7 dias', () => {
+    const result = duplicateCharges([
+      { id: 'a', recurrenceId: 'spotify', amountCents: 2190, postedAt: at(3) },
+      { id: 'b', recurrenceId: 'spotify', amountCents: 2190, postedAt: at(5) },
+      { id: 'c', recurrenceId: 'netflix', amountCents: 3990, postedAt: at(1) },
+    ]);
+    expect(result).toEqual([{ id: 'b', firstId: 'a', recurrenceId: 'spotify' }]);
+  });
+  it('cobrança do mês seguinte ou valor diferente não é duplicada', () => {
+    expect(
+      duplicateCharges([
+        { id: 'a', recurrenceId: 's', amountCents: 2190, postedAt: at(3) },
+        {
+          id: 'b',
+          recurrenceId: 's',
+          amountCents: 2190,
+          postedAt: new Date(Date.UTC(2026, 10, 3, 12)),
+        },
+        {
+          id: 'c',
+          recurrenceId: 's',
+          amountCents: 4990,
+          postedAt: new Date(Date.UTC(2026, 10, 5, 12)),
+        },
+      ]),
+    ).toEqual([]);
   });
 });

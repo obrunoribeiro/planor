@@ -2,20 +2,34 @@
 //
 // Total, datas de fechamento e vencimento, e a quebra por parcelas, assinaturas e fixos. Aberta
 // pelo card de fatura do Futuro (`id` = conta do cartão); mostra a fatura que o usuário tem que
-// pagar a seguir. Além do Figma: "Outras compras" (compras avulsas, que numa fatura real são a
+// pagar a seguir, com chips pra trocar de mês. Além do Figma: "Outras compras" (compras avulsas, que numa fatura real são a
 // maior parte) e "Ainda não detalhado" (o que o banco cobrou mas não mandou uma a uma) — sem eles a
 // soma das seções não bateria com o total.
-import { colors, EmptyState, gradients, Icon, type IconName, radius, ScreenHeader, SecondaryButton, Skeleton, space, typography } from '@planor/ui';
+import {
+  Chip,
+  colors,
+  EmptyState,
+  gradients,
+  Icon,
+  type IconName,
+  radius,
+  ScreenHeader,
+  SecondaryButton,
+  Skeleton,
+  space,
+  typography,
+} from '@planor/ui';
 import { monthNamePtBR } from '@planor/shared';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Money } from '@/components/Money';
 import { ScreenGlow } from '@/components/ScreenGlow';
 import { BankAvatar } from '@/features/contas/shared';
 import { useCardStatementQuery } from '@/lib/api/queries';
 import type { CardStatementResponse } from '@/lib/api/types';
+import { monthYearShortLabel } from '@/lib/format';
 import { goBack } from '@/lib/navigation';
 
 /** "2026-11-11" → "11/11". */
@@ -32,7 +46,17 @@ function summaryLabel(data: CardStatementResponse): string {
   return 'Já comprometido';
 }
 
-function Section({ icon, title, amountCents, children }: { icon: IconName; title: string; amountCents: number; children?: ReactNode }) {
+function Section({
+  icon,
+  title,
+  amountCents,
+  children,
+}: {
+  icon: IconName;
+  title: string;
+  amountCents: number;
+  children?: ReactNode;
+}) {
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
@@ -47,7 +71,15 @@ function Section({ icon, title, amountCents, children }: { icon: IconName; title
   );
 }
 
-function Line({ title, caption, amountCents }: { title: string; caption?: string; amountCents?: number }) {
+function Line({
+  title,
+  caption,
+  amountCents,
+}: {
+  title: string;
+  caption?: string;
+  amountCents?: number;
+}) {
   return (
     <View style={styles.line}>
       <View style={styles.lineTexts}>
@@ -63,7 +95,9 @@ function Line({ title, caption, amountCents }: { title: string; caption?: string
 
 export default function FaturaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data, isPending, isError, refetch } = useCardStatementQuery(id);
+  // Sem mês escolhido: a fatura que vence a seguir (a mesma do card do Futuro).
+  const [month, setMonth] = useState<string | undefined>(undefined);
+  const { data, isPending, isError, refetch } = useCardStatementQuery(id, month);
 
   if (isPending) {
     return (
@@ -80,7 +114,13 @@ export default function FaturaScreen() {
   if (isError) {
     return (
       <View style={[styles.screen, styles.centered]}>
-        <EmptyState icon="aviso" title="Não deu pra carregar" text="Confira sua internet e tenta de novo." actionLabel="Tentar de novo" onAction={() => refetch()} />
+        <EmptyState
+          icon="aviso"
+          title="Não deu pra carregar"
+          text="Confira sua internet e tenta de novo."
+          actionLabel="Tentar de novo"
+          onAction={() => refetch()}
+        />
       </View>
     );
   }
@@ -94,6 +134,28 @@ export default function FaturaScreen() {
       <ScreenGlow />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <ScreenHeader title={title} onBack={() => goBack('/futuro')} />
+
+        {data.availableMonths.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.months}
+            // Começa mostrando o mês escolhido (cada chip tem ~76 pt).
+            contentOffset={{
+              x: Math.max(0, data.availableMonths.indexOf(data.month) * 76 - 120),
+              y: 0,
+            }}
+          >
+            {data.availableMonths.map((m) => (
+              <Chip
+                key={m}
+                label={monthYearShortLabel(`${m}-01`)}
+                active={m === data.month}
+                onPress={() => setMonth(m)}
+              />
+            ))}
+          </ScrollView>
+        )}
 
         <LinearGradient
           colors={gradients.cardDestaque.colors}
@@ -122,7 +184,11 @@ export default function FaturaScreen() {
         </LinearGradient>
 
         {data.totalCents === 0 ? (
-          <EmptyState icon="cartao" title="Nada nesta fatura ainda" text="As compras no cartão aparecem aqui conforme o banco manda." />
+          <EmptyState
+            icon="cartao"
+            title="Nada nesta fatura ainda"
+            text="As compras no cartão aparecem aqui conforme o banco manda."
+          />
         ) : (
           <>
             {installments.totalCents > 0 && (
@@ -131,7 +197,11 @@ export default function FaturaScreen() {
                   <Line
                     key={`${item.name}-${index}`}
                     title={item.name}
-                    caption={item.number && item.count ? `parcela ${item.number} de ${item.count}` : undefined}
+                    caption={
+                      item.number && item.count
+                        ? `parcela ${item.number} de ${item.count}`
+                        : undefined
+                    }
                     amountCents={item.amountCents}
                   />
                 ))}
@@ -139,9 +209,17 @@ export default function FaturaScreen() {
             )}
 
             {subscriptions.totalCents > 0 && (
-              <Section icon="assinaturas" title="Assinaturas" amountCents={subscriptions.totalCents}>
+              <Section
+                icon="assinaturas"
+                title="Assinaturas"
+                amountCents={subscriptions.totalCents}
+              >
                 <Line
-                  title={subscriptions.count === 1 ? '1 assinatura' : `${subscriptions.count} assinaturas`}
+                  title={
+                    subscriptions.count === 1
+                      ? '1 assinatura'
+                      : `${subscriptions.count} assinaturas`
+                  }
                   caption={
                     subscriptions.unusedCount === 0
                       ? undefined
@@ -157,14 +235,22 @@ export default function FaturaScreen() {
             {bills.totalCents > 0 && (
               <Section icon="repetir" title="Fixos recorrentes" amountCents={bills.totalCents}>
                 {bills.items.map((item, index) => (
-                  <Line key={`${item.name}-${index}`} title={item.name} amountCents={item.amountCents} />
+                  <Line
+                    key={`${item.name}-${index}`}
+                    title={item.name}
+                    amountCents={item.amountCents}
+                  />
                 ))}
               </Section>
             )}
 
             {otherPurchases.totalCents > 0 && (
               <Section icon="sacola" title="Outras compras" amountCents={otherPurchases.totalCents}>
-                <Line title={otherPurchases.count === 1 ? '1 compra' : `${otherPurchases.count} compras`} />
+                <Line
+                  title={
+                    otherPurchases.count === 1 ? '1 compra' : `${otherPurchases.count} compras`
+                  }
+                />
               </Section>
             )}
 
@@ -176,14 +262,20 @@ export default function FaturaScreen() {
           </>
         )}
 
-        {stillOpen && <Text style={styles.note}>Compras novas até {dayMonth(data.closingDate)} também entram nesta fatura.</Text>}
+        {stillOpen && (
+          <Text style={styles.note}>
+            Compras novas até {dayMonth(data.closingDate)} também entram nesta fatura.
+          </Text>
+        )}
 
         <View style={styles.spacer} />
 
         <SecondaryButton
           label="Ver transações do cartão"
           icon="gastos"
-          onPress={() => router.push({ pathname: '/gastos/transacoes', params: { accountId: data.accountId } })}
+          onPress={() =>
+            router.push({ pathname: '/gastos/transacoes', params: { accountId: data.accountId } })
+          }
         />
       </ScrollView>
     </View>
@@ -193,6 +285,7 @@ export default function FaturaScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.dark.bg.default },
   centered: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: space[24] },
+  months: { gap: space[8] },
   content: {
     flexGrow: 1,
     paddingTop: space[60],
@@ -261,7 +354,13 @@ const styles = StyleSheet.create({
     borderColor: colors.dark.border.default,
     backgroundColor: colors.dark.bg.surface,
   },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: space[12], paddingTop: space[12], paddingBottom: space[8] },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[12],
+    paddingTop: space[12],
+    paddingBottom: space[8],
+  },
   sectionIcon: {
     width: 36,
     height: 36,
@@ -283,7 +382,13 @@ const styles = StyleSheet.create({
     lineHeight: typography.numberSmall.lineHeight,
     color: colors.dark.text.primary,
   },
-  line: { flexDirection: 'row', alignItems: 'center', gap: space[8], paddingLeft: space[48], paddingVertical: space[8] },
+  line: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[8],
+    paddingLeft: space[48],
+    paddingVertical: space[8],
+  },
   lineTexts: { flex: 1 },
   lineTitle: {
     fontFamily: typography.bodyMedium.fontFamily,

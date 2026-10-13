@@ -22,6 +22,7 @@ import {
   billClosingDateKey,
   categoriesAheadOfPace,
   categoryLimitStatus,
+  duplicateCharges,
   lastMonthKeys,
   latestPriceChange,
   monthlyAverageCents,
@@ -273,6 +274,55 @@ async function detectStatementClosing(userId: string, now: Date) {
   return result;
 }
 
+/** Cobrança duplicada de assinatura (§6.3, passo 5): olha as cobranças dos últimos 35 dias. */
+async function detectDuplicateCharges(userId: string, now: Date) {
+  const since = new Date(now.getTime() - 35 * DAY_MS);
+  const [charges, alerted] = await Promise.all([
+    db
+      .select({
+        id: transactions.id,
+        recurrenceId: transactions.recurrenceId,
+        amountCents: transactions.amountCents,
+        postedAt: transactions.postedAt,
+        merchantName: recurrences.merchantName,
+      })
+      .from(transactions)
+      .innerJoin(recurrences, eq(recurrences.id, transactions.recurrenceId))
+      .where(
+        and(
+          eq(transactions.userId, userId),
+          eq(recurrences.kind, 'subscription'),
+          eq(transactions.isHidden, false),
+          lt(transactions.amountCents, 0),
+          gte(transactions.postedAt, since),
+          lte(transactions.postedAt, now),
+        ),
+      ),
+    existingKeys(userId, 'subscription_duplicate_charge', 'transactionId'),
+  ]);
+  const byId = new Map(charges.map((c) => [c.id, c]));
+  return duplicateCharges(
+    charges.map((c) => ({
+      id: c.id,
+      recurrenceId: c.recurrenceId!,
+      amountCents: -c.amountCents,
+      postedAt: c.postedAt,
+    })),
+  )
+    .filter((d) => !alerted.has(d.id))
+    .map((d) => ({
+      userId,
+      type: 'subscription_duplicate_charge',
+      payload: {
+        transactionId: d.id,
+        firstTransactionId: d.firstId,
+        recurrenceId: d.recurrenceId,
+        merchantName: byId.get(d.id)?.merchantName ?? null,
+        amountCents: -(byId.get(d.id)?.amountCents ?? 0),
+      },
+    }));
+}
+
 /** Limite de categoria (§6.5): aviso em 80% (se ligado) e estouro, uma vez por mês cada. */
 async function detectCategoryLimits(userId: string, now: Date) {
   const month = todayKeySaoPaulo(now).slice(0, 7);
@@ -335,6 +385,7 @@ export async function detectAlerts(
       detectPriceUps(userId, now),
       detectStatementClosing(userId, now),
       detectCategoryLimits(userId, now),
+      detectDuplicateCharges(userId, now),
     ])
   ).flat();
   if (found.length > 0 && !options.dryRun) await db.insert(alerts).values(found);

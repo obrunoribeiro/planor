@@ -123,14 +123,18 @@ export function useUpdateSubscriptionMutation(id: string) {
   });
 }
 
-export function useCardStatementQuery(accountId: string) {
+export function useCardStatementQuery(accountId: string, month?: string) {
   const accessToken = useAccessToken();
   return useQuery({
-    queryKey: ['card-statement', accountId],
+    queryKey: ['card-statement', accountId, month ?? 'a-pagar'],
     queryFn: () =>
-      apiFetch<CardStatementResponse>(`/future/statements/${accountId}`, {
-        accessToken: accessToken!,
-      }),
+      apiFetch<CardStatementResponse>(
+        `/future/statements/${accountId}${month ? `?month=${month}` : ''}`,
+        {
+          accessToken: accessToken!,
+        },
+      ),
+    placeholderData: (previous) => previous,
     enabled: !!accessToken && !!accountId,
   });
 }
@@ -215,13 +219,25 @@ export function useDeleteFixedBillMutation() {
   });
 }
 
-export function useFutureTimelineQuery() {
+export type CommitmentKind = 'installments' | 'subscriptions' | 'bills';
+export const ALL_COMMITMENT_KINDS: CommitmentKind[] = ['installments', 'subscriptions', 'bills'];
+
+/** "Filtrar compromissos" (Figma 49:1095): tipos e horizonte. Sem filtro, tudo em 6 meses. */
+export function useFutureTimelineQuery(
+  filter: { kinds: CommitmentKind[]; months: number } = { kinds: ALL_COMMITMENT_KINDS, months: 6 },
+) {
   const accessToken = useAccessToken();
+  const params = new URLSearchParams({
+    kinds: filter.kinds.join(','),
+    months: String(filter.months),
+  });
   return useQuery({
-    queryKey: ['future-timeline'],
+    // 'future-timeline' primeiro: as invalidações existentes continuam pegando todas as variações.
+    queryKey: ['future-timeline', filter.kinds.join(','), filter.months],
     queryFn: () =>
-      apiFetch<FutureTimelineResponse>('/future/timeline', { accessToken: accessToken! }),
+      apiFetch<FutureTimelineResponse>(`/future/timeline?${params}`, { accessToken: accessToken! }),
     enabled: !!accessToken,
+    placeholderData: (previous) => previous,
   });
 }
 

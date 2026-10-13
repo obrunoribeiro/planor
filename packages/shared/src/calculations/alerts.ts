@@ -80,7 +80,34 @@ export const KNOWN_ALERT_TYPES = [
   'bank_disconnected',
   'limit_80',
   'limit_exceeded',
+  'subscription_duplicate_charge',
 ] as const;
+
+/** Duas cobranças da mesma assinatura com valor parecido (±5%) em até 7 dias: provável cobrança
+ * duplicada (§6.3, passo 5). Devolve a segunda de cada par. */
+export const DUPLICATE_WINDOW_DAYS = 7;
+
+export function duplicateCharges(
+  charges: { id: string; recurrenceId: string; amountCents: AmountCents; postedAt: Date }[],
+): { id: string; firstId: string; recurrenceId: string }[] {
+  const byRecurrence = new Map<string, typeof charges>();
+  for (const c of charges)
+    byRecurrence.set(c.recurrenceId, [...(byRecurrence.get(c.recurrenceId) ?? []), c]);
+  const result: { id: string; firstId: string; recurrenceId: string }[] = [];
+  for (const list of byRecurrence.values()) {
+    const sorted = [...list].sort((a, b) => a.postedAt.getTime() - b.postedAt.getTime());
+    for (let i = 1; i < sorted.length; i++) {
+      const previous = sorted[i - 1]!;
+      const current = sorted[i]!;
+      const days = (current.postedAt.getTime() - previous.postedAt.getTime()) / 86_400_000;
+      const similar =
+        Math.abs(current.amountCents - previous.amountCents) <= previous.amountCents * 0.05;
+      if (days <= DUPLICATE_WINDOW_DAYS && similar)
+        result.push({ id: current.id, firstId: previous.id, recurrenceId: current.recurrenceId });
+    }
+  }
+  return result;
+}
 
 export type AlertTone = 'brand' | 'alert' | 'error' | 'success';
 
@@ -147,6 +174,17 @@ export function describeAlert(type: string, payload: Payload): AlertView {
         icon: 'aviso',
         route: payload.recurrenceId
           ? `/futuro/assinatura/${str(payload.recurrenceId)}`
+          : '/futuro/assinaturas',
+        important: true,
+      };
+    case 'subscription_duplicate_charge':
+      return {
+        title: 'Cobrança duplicada?',
+        body: `${str(payload.merchantName, 'Uma assinatura')} cobrou ${formatCents(num(payload.amountCents))} duas vezes em poucos dias. Confira no app do banco.`,
+        tone: 'error',
+        icon: 'aviso',
+        route: payload.transactionId
+          ? `/gastos/transacao/${str(payload.transactionId)}`
           : '/futuro/assinaturas',
         important: true,
       };

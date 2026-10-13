@@ -423,6 +423,16 @@ protótipo do Figma.
   compras) ficou em Lazer, confirmado pelo Bruno. No primeiro teste, antes do
   `looksLikePersonName`, ~13 nomes de pessoa que vendem na maquininha foram enviados uma vez; as
   respostas deles foram apagadas do cache e não são mais enviados.
+- **Cobrança duplicada de assinatura (§6.3, passo 5)** — alerta novo
+  `subscription_duplicate_charge` (registrado no CONTEXTO §6.9): a mesma assinatura cobrou valor
+  parecido (±5%) duas vezes em até 7 dias (`duplicateCharges` em packages/shared, com teste),
+  olhando os últimos 35 dias. Nenhuma duplicada nos dados do Bruno.
+- **"Filtrar compromissos" no Futuro (Figma 49:1095)** — o botão de filtro e os chips Tudo /
+  Parcelas / Assinaturas / Fixos (que antes não filtravam nada) agora filtram de verdade: o card
+  "Já comprometido", as barras e o bloco do mês. Sheet com "Mostrar" e "Até" 3, 6 ou 12 meses.
+  `GET /future/timeline?kinds=&months=`; `committed_by_month` passou a guardar 12 meses (era 6).
+- **Fatura do cartão: trocar de mês** — chips de mês no topo (até 6 fechadas, a aberta e as futuras
+  com parcela); a resposta traz `availableMonths`.
 - **Metas e limites de categoria (§6.8, §6.5)** — telas `app/ia/metas.tsx` (Figma 51:1177) e
   `app/ia/meta/[id].tsx` (51:1249), sheets "Nova meta"/editar (51:1322), "Registrar valor
   guardado" (51:1295) e "Criar limite" (46:934, com o componente novo `Slider` em `@planor/ui`).
@@ -484,17 +494,16 @@ protótipo do Figma.
   conta do Bruno e desfeito: quitar o PagTesouro tirou R$ 29,12 de cada mês até abril.
 
 **Falta:**
-- Assinaturas: "cobrança duplicada" (§6.3, passo 5) ainda não é detectada.
 - Alertas: push (§9, `push-dispatcher`; precisa da conta paga de desenvolvedor da Apple) e
   preferências por tipo/horário silencioso; tipos do §6.9 ainda não gerados (`charge_upcoming`,
   `subscription_new`, `installment_new`, `limit_80`/`limit_exceeded`, `weekly_plan_ready`,
   `monthly_recap_ready`, `household_*`, `social_*`, `trial_ending`). O ícone `cadeado` do
   registry tem o desenho de uma estrela — conferir no Figma. Os 3 alertas fictícios do seed
   foram apagados da conta do Bruno (2026-10-12, com o OK dele). Plano da semana: faltam os itens que dependem de metas e dos objetivos do onboarding.
-- Parcelas: o filtro do topo ("Filtrar compromissos", 49:1095). "Avisar antes da última parcela"
+- Parcelas: "Avisar antes da última parcela"
   (do sheet de editar) espera o push (§6.9).
-- Fixos: editar uma conta cadastrada à mão (hoje só remove). Fatura do cartão: trocar de mês
-  (a rota já aceita `?month=`, a tela ainda não tem seletor).
+- Fixos: editar uma conta cadastrada à mão (hoje só remove). "Filtrar compromissos": a parte
+  "Cartões e contas" (assinaturas e fixos ainda não guardam em qual cartão/conta caem).
 - Assinaturas: "Me lembrar 3 dias antes da cobrança" (Figma 49:1269) e o lembrete de 30 dias do
   "Uso pouco" esperam o push (§6.9) — sem ele, "Lembrete criado" seria mentira. O alerta de
   cobrança depois do cancelamento só aparece no contador do sino (a central de alertas ainda não

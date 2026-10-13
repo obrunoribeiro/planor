@@ -38,19 +38,36 @@ import {
 export async function futureRoutes(app: FastifyInstance) {
   // Uma rota só pra tudo que a tela "Futuro" mostra (mesmo padrão do `/home`) — as rotas de
   // detalhe por item (`/future/installments` etc.) continuam Fase 3, essa aqui é só o resumo.
+  // "Filtrar compromissos" (Figma 49:1095): `kinds` escolhe parcelas/assinaturas/fixos e `months`
+  // o horizonte (3, 6 ou 12 meses). Sem nada: tudo, 6 meses.
+  const timelineQuery = z.object({
+    kinds: z
+      .string()
+      .optional()
+      .transform((v) => (v ? v.split(',') : ['installments', 'subscriptions', 'bills'])),
+    months: z.coerce.number().int().min(1).max(12).default(6),
+  });
   app.get('/future/timeline', async (request, reply) => {
     const userId = await requireUserId(request, reply);
     if (!userId) return;
+    const query = timelineQuery.safeParse(request.query);
+    if (!query.success) return reply.code(400).send({ error: 'invalid_request' });
+    const kinds = new Set(query.data.kinds);
 
     const committedRows = await db
       .select()
       .from(committedByMonth)
       .where(eq(committedByMonth.userId, userId))
-      .orderBy(committedByMonth.month);
+      .orderBy(committedByMonth.month)
+      .limit(query.data.months);
+    const sumKinds = (row: (typeof committedRows)[number]) =>
+      (kinds.has('installments') ? row.installmentsCents : 0) +
+      (kinds.has('subscriptions') ? row.subscriptionsCents : 0) +
+      (kinds.has('bills') ? row.billsCents : 0);
 
     const months = committedRows.map((row, index) => ({
       label: monthAbbrevPtBR(row.month),
-      amountCents: row.installmentsCents + row.subscriptionsCents + row.billsCents,
+      amountCents: sumKinds(row),
       active: index === 0,
     }));
     const totalCents = months.reduce((sum, m) => sum + m.amountCents, 0);
@@ -105,7 +122,7 @@ export async function futureRoutes(app: FastifyInstance) {
       currentMonth: current
         ? {
             label: monthNamePtBR(current.month),
-            totalCents: current.installmentsCents + current.subscriptionsCents + current.billsCents,
+            totalCents: sumKinds(current),
             installments: { count: plans.length, amountCents: current.installmentsCents },
             subscriptions: {
               count: activeSubscriptions.length,
@@ -549,10 +566,38 @@ export async function futureRoutes(app: FastifyInstance) {
       ? calendarDateKey(statement.dueDate)
       : dayInMonthKey(month, card.dueDay);
 
+    // Meses pra navegar: até 6 faturas fechadas, a aberta e as futuras que já têm parcela.
+    const [closedPeriods, futureMonths] = await Promise.all([
+      db
+        .select({ period: cardStatements.period })
+        .from(cardStatements)
+        .where(eq(cardStatements.accountId, id))
+        .orderBy(desc(cardStatements.period))
+        .limit(6),
+      db
+        .selectDistinct({ month: transactions.billMonth })
+        .from(transactions)
+        .where(
+          and(
+            eq(transactions.accountId, id),
+            sql`${transactions.billMonth} > ${openMonth ?? month}`,
+          ),
+        ),
+    ]);
+    const availableMonths = [
+      ...new Set([
+        ...closedPeriods.map((p) => p.period),
+        ...(openMonth ? [openMonth] : []),
+        ...futureMonths.map((f) => f.month!).filter(Boolean),
+        month,
+      ]),
+    ].sort();
+
     return {
       accountId: id,
       bank: card.bankName,
       month,
+      availableMonths,
       kind,
       paid: statement ? statement.paidCents >= statement.totalCents : false,
       totalCents,

@@ -509,6 +509,7 @@ Exemplo: 6.500,00 − 3.910,10 − 1.341,00 = **1.248,90**.
 | `subscription_price_up` | Reajuste detectado | Lista de assinaturas |
 | `subscription_new` | Nova recorrência detectada | Detalhe |
 | `subscription_charged_after_cancel` | Cobrança de uma assinatura marcada como "Já cancelei" | Detalhe da assinatura |
+| `subscription_duplicate_charge` | A mesma assinatura cobrou valor parecido (±5%) duas vezes em até 7 dias | Detalhe da transação |
 | `unused_subscription_reminder` | Marcada como sem uso, 3 dias antes da cobrança | Detalhe |
 | `unusual_spend` | Gasto fora do padrão | Detalhe da transação |
 | `installment_new` | Nova compra parcelada | Detalhe da parcela |
@@ -793,7 +794,7 @@ POST /imports                      # upload PDF/OFX → job de extração
 GET  /transactions?filters · GET /transactions/:id · PATCH /transactions/:id (categoria, tipo, oculta, nota)
 POST /category-rules
 GET  /spending/summary?period · GET /spending/category/:id
-GET  /future/timeline · /installments · /subscriptions · /bills · /statements/:id
+GET  /future/timeline?kinds=installments,subscriptions,bills&months=3|6|12 · /installments · /subscriptions · /bills · /statements/:id
 GET  /future/statements/:accountId?month=YYYY-MM  # fatura do cartão; sem month, a que vence a seguir
 POST /future/bills · DELETE /future/bills/:id   # "Nova conta fixa" cadastrada à mão
 PATCH /future/installments/:id (name, categoryId, settledEarly)   # "Editar parcelamento"

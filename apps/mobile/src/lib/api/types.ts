@@ -202,6 +202,8 @@ export type CardStatementResponse = {
   bank: string;
   /** Mês do vencimento, "YYYY-MM". */
   month: string;
+  /** Meses com fatura pra navegar (fechadas recentes, a aberta e futuras com parcela), em ordem. */
+  availableMonths: string[];
   /** `closed` = já fechou; `open` = ainda recebe compras; `future` = só parcelas já lançadas. */
   kind: 'closed' | 'open' | 'future';
   paid: boolean;
