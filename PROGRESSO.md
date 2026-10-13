@@ -423,6 +423,14 @@ protótipo do Figma.
   compras) ficou em Lazer, confirmado pelo Bruno. No primeiro teste, antes do
   `looksLikePersonName`, ~13 nomes de pessoa que vendem na maquininha foram enviados uma vez; as
   respostas deles foram apagadas do cache e não são mais enviados.
+- **Ajustes de interface pedidos pelo Bruno (2026-10-13):** selos ("Pro", "v2") centralizados na
+  linha do Perfil (`ListItem` centraliza o slot da direita); na lista de categorias de Gastos o
+  texto da esquerda quebra linha e o valor/percentual não encolhem (antes "Ainda não detalhadas"
+  vazava do card) — e o valor da linha passou a obedecer ao olho; "Nova meta"/"Editar meta" ganhou
+  prazo "Outro" (mês/ano digitado) e "Sem prazo"; conversas da Planor IA podem ser excluídas
+  (arrastar pra esquerda ou segurar, com confirmação) — `DELETE /ai/conversations/:id`.
+  O campo de mensagem da Planor IA cresce com o texto (até 5 linhas, depois rola) em vez de
+  andar pro lado; Return envia.
 - **Planor IA com streaming (SSE)** — `POST /ai/chat?stream=1` manda o texto aos pedaços
   (`delta`) e termina com `done` (mesmo corpo da resposta sem stream). No app, `src/lib/api/aiStream.ts`
   lê com o `fetch` do `expo/fetch` (o do React Native não lê o corpo aos poucos); o balão vai

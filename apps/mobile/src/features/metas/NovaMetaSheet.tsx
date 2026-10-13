@@ -4,6 +4,7 @@ import {
   addMonthsToKey,
   dayInMonthKey,
   formatCents,
+  monthsUntil,
   paceCents,
   reaisToCents,
 } from '@planor/shared';
@@ -32,6 +33,24 @@ import { parseReaisInput } from '@/lib/format';
 import { useMaskedMoneyText } from '@/lib/useMaskedMoneyText';
 
 const DEADLINES = [6, 12, 18] as const;
+/** Prazo escolhido: um dos atalhos em meses, "Outro" (mês/ano digitado) ou "Sem prazo". */
+type DeadlineMode = (typeof DEADLINES)[number] | 'outro' | 'sem';
+
+/** "03/2027" ou "3/2027" → "2027-03"; nulo se não for mês/ano válido e futuro. */
+function parseMonthYear(text: string): string | null {
+  const match = text.trim().match(/^(\d{1,2})\s*\/\s*(\d{4})$/);
+  if (!match) return null;
+  const month = Number(match[1]);
+  if (month < 1 || month > 12) return null;
+  const key = `${match[2]}-${String(month).padStart(2, '0')}`;
+  return key > todayKey().slice(0, 7) ? key : null;
+}
+
+/** Digitando "032027" vira "03/2027". */
+function maskMonthYear(text: string): string {
+  const digits = text.replace(/\D/g, '').slice(0, 6);
+  return digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
+}
 
 function todayKey(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
@@ -75,7 +94,8 @@ export function NovaMetaSheet({
   const update = useUpdateGoalMutation(goal?.id ?? '');
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
-  const [months, setMonths] = useState<number | null>(12);
+  const [mode, setMode] = useState<DeadlineMode>(12);
+  const [customDate, setCustomDate] = useState('');
 
   useEffect(() => {
     if (!visible) return;
@@ -83,14 +103,49 @@ export function NovaMetaSheet({
     setAmount(
       goal ? centsToInput(goal.targetCents) : initial ? centsToInput(initial.targetCents) : '',
     );
-    // Editando, o prazo continua o que estava, a não ser que escolha outro.
-    setMonths(goal ? null : initial ? initial.months : 12);
+    // Editando: o prazo que estava aparece em "Outro" (mês/ano), ou "Sem prazo".
+    const existing = goal?.deadline ?? null;
+    const initialMonths = initial?.months ?? null;
+    if (goal) {
+      setMode(existing ? 'outro' : 'sem');
+      setCustomDate(existing ? `${existing.slice(5, 7)}/${existing.slice(0, 4)}` : '');
+    } else if (initial) {
+      const preset = DEADLINES.find((d) => d === initialMonths);
+      setMode(preset ?? (initialMonths ? 'outro' : 'sem'));
+      setCustomDate(
+        initialMonths && !preset
+          ? (() => {
+              const key = addMonthsToKey(todayKey().slice(0, 7), initialMonths);
+              return `${key.slice(5, 7)}/${key.slice(0, 4)}`;
+            })()
+          : '',
+      );
+    } else {
+      setMode(12);
+      setCustomDate('');
+    }
   }, [visible, goal, initial]);
+
+  // Prazo final ("YYYY-MM-DD") e meses até ele. "Outro": último dia do mês digitado.
+  const customMonth = mode === 'outro' ? parseMonthYear(customDate) : null;
+  const deadline =
+    mode === 'sem'
+      ? null
+      : mode === 'outro'
+        ? customMonth
+          ? dayInMonthKey(customMonth, 31)
+          : null
+        : deadlineIn(mode);
+  const months = deadline ? monthsUntil(todayKey(), deadline) : null;
+  const customInvalid = mode === 'outro' && customDate.length >= 6 && !customMonth;
 
   const amountValue = parseReaisInput(amount);
   const targetCents = amountValue && amountValue > 0 ? reaisToCents(amountValue) : null;
   const isLimit = goal?.type === 'category_limit';
-  const canSave = (isLimit || name.trim().length > 0) && targetCents !== null;
+  const canSave =
+    (isLimit || name.trim().length > 0) &&
+    targetCents !== null &&
+    (mode !== 'outro' || customMonth !== null);
 
   const perMonth =
     targetCents && months
@@ -116,7 +171,7 @@ export function NovaMetaSheet({
         {
           ...(isLimit ? {} : { name: name.trim() }),
           targetCents,
-          ...(months ? { deadline: deadlineIn(months) } : {}),
+          ...(isLimit ? {} : { deadline }),
         },
         { onSuccess: onClose },
       );
@@ -126,7 +181,7 @@ export function NovaMetaSheet({
           type: 'savings',
           name: name.trim(),
           targetCents,
-          deadline: months ? deadlineIn(months) : null,
+          deadline,
         },
         {
           onSuccess: () => {
@@ -165,14 +220,21 @@ export function NovaMetaSheet({
           <Text style={styles.label}>Prazo</Text>
           <View style={styles.chips}>
             {DEADLINES.map((m) => (
-              <Chip
-                key={m}
-                label={`${m} meses`}
-                active={months === m}
-                onPress={() => setMonths(months === m ? null : m)}
-              />
+              <Chip key={m} label={`${m} meses`} active={mode === m} onPress={() => setMode(m)} />
             ))}
+            <Chip label="Outro" active={mode === 'outro'} onPress={() => setMode('outro')} />
+            <Chip label="Sem prazo" active={mode === 'sem'} onPress={() => setMode('sem')} />
           </View>
+          {mode === 'outro' && (
+            <TextField
+              label="Até quando (mês/ano)"
+              value={customDate}
+              onChangeText={(text) => setCustomDate(maskMonthYear(text))}
+              placeholder="03/2027"
+              keyboardType="number-pad"
+              error={customInvalid ? 'Use um mês a partir do próximo, ex.: 03/2027' : undefined}
+            />
+          )}
         </View>
       )}
       {tip && (
@@ -213,7 +275,7 @@ const styles = StyleSheet.create({
     letterSpacing: typography.labelSmall.letterSpacing,
     color: colors.dark.text.secondary,
   },
-  chips: { flexDirection: 'row', gap: space[8] },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space[8] },
   tip: {
     flexDirection: 'row',
     alignItems: 'flex-start',

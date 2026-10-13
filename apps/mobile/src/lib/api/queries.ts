@@ -684,3 +684,13 @@ export function useAddContributionMutation(goalId: string) {
     onSuccess: () => invalidateGoals(queryClient),
   });
 }
+
+export function useDeleteAiConversationMutation() {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<void>(`/ai/conversations/${id}`, { method: 'DELETE', accessToken: accessToken! }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['ai-conversations'] }),
+  });
+}

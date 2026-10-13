@@ -801,7 +801,7 @@ PATCH /future/installments/:id (name, categoryId, settledEarly)   # "Editar parc
 PATCH /subscriptions/:id (usage, cancelled, reminder)
 GET/POST /goals · GET/PATCH/DELETE /goals/:id · POST /goals/:id/contributions   # limite de categoria é goal type=category_limit
 GET  /alerts · POST /alerts/read { ids? }   # sem ids: marcar todos como lidos
-POST /ai/chat (?stream=1 = SSE: eventos delta/done/error) · GET /ai/conversations · GET /ai/conversations/:id · GET /ai/usage
+POST /ai/chat (?stream=1 = SSE: eventos delta/done/error) · GET /ai/conversations · GET/DELETE /ai/conversations/:id · GET /ai/usage
 GET/POST /households · invites · /households/:id/dashboard · /settlements
 GET/POST /friends · /feed · /posts/:id/reactions|comments · /challenges · /split-expenses
 GET  /recaps/:month

@@ -1,9 +1,10 @@
 // Planor IA · Histórico — CONTEXTO.md §6.7. Node 50:1127 no Figma.
 //
 // Cota do mês (só no Grátis), "Nova conversa" e as conversas em "Esta semana" e "Antes". Tocar
-// abre a conversa na aba da IA. "Ver Pro" fica de fora até existir a assinatura (RevenueCat).
+// abre a conversa na aba da IA; arrastar pra esquerda (ou segurar) exclui. "Ver Pro" fica de fora até existir a assinatura (RevenueCat).
 import {
   colors,
+  Dialog,
   EmptyState,
   gradients,
   Icon,
@@ -16,9 +17,15 @@ import {
 import { monthNamePtBR } from '@planor/shared';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { ScreenGlow } from '@/components/ScreenGlow';
-import { useAiConversationsQuery, useAiUsageQuery } from '@/lib/api/queries';
+import {
+  useAiConversationsQuery,
+  useAiUsageQuery,
+  useDeleteAiConversationMutation,
+} from '@/lib/api/queries';
 import type { AiConversationListItem } from '@/lib/api/types';
 import { alertTimeLabel, dayGroupLabel, saoPauloDateKey } from '@/lib/format';
 import { goBack } from '@/lib/navigation';
@@ -31,7 +38,30 @@ function whenLabel(iso: string): string {
   return group === 'Hoje' || group === 'Ontem' ? group : alertTimeLabel(iso);
 }
 
-function Section({ title, items }: { title: string; items: AiConversationListItem[] }) {
+/** Botão "Excluir" que aparece ao arrastar a conversa pra esquerda. */
+function DeleteAction({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      style={styles.deleteAction}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Excluir conversa"
+    >
+      <Icon name="fechar" size={18} color={colors.dark.text.onBrand} />
+      <Text style={styles.deleteLabel}>Excluir</Text>
+    </Pressable>
+  );
+}
+
+function Section({
+  title,
+  items,
+  onDelete,
+}: {
+  title: string;
+  items: AiConversationListItem[];
+  onDelete: (item: AiConversationListItem) => void;
+}) {
   const mask = useMaskedMoneyText();
   if (items.length === 0) return null;
   return (
@@ -39,29 +69,45 @@ function Section({ title, items }: { title: string; items: AiConversationListIte
       <Text style={styles.sectionTitle}>{title}</Text>
       <View style={styles.list}>
         {items.map((item, index) => (
-          <Pressable
+          <ReanimatedSwipeable
             key={item.id}
-            style={[styles.row, index === items.length - 1 ? null : styles.rowBorder]}
-            onPress={() =>
-              router.navigate({ pathname: '/ia', params: { conversationId: item.id } })
-            }
-            accessibilityRole="button"
+            friction={2}
+            rightThreshold={40}
+            overshootRight={false}
+            renderRightActions={(_progress, _translation, methods) => (
+              <DeleteAction
+                onPress={() => {
+                  methods.close();
+                  onDelete(item);
+                }}
+              />
+            )}
           >
-            <View style={styles.rowIcon}>
-              <Icon name="chat" size={18} color={colors.dark.text.brand} />
-            </View>
-            <View style={styles.rowTexts}>
-              <Text style={styles.rowTitle} numberOfLines={1}>
-                {item.title}
-              </Text>
-              {item.preview ? (
-                <Text style={styles.rowPreview} numberOfLines={2}>
-                  {mask(item.preview)}
+            <Pressable
+              style={[styles.row, index === items.length - 1 ? null : styles.rowBorder]}
+              onPress={() =>
+                router.navigate({ pathname: '/ia', params: { conversationId: item.id } })
+              }
+              onLongPress={() => onDelete(item)}
+              accessibilityRole="button"
+              accessibilityHint="Arraste pra esquerda ou segure pra excluir"
+            >
+              <View style={styles.rowIcon}>
+                <Icon name="chat" size={18} color={colors.dark.text.brand} />
+              </View>
+              <View style={styles.rowTexts}>
+                <Text style={styles.rowTitle} numberOfLines={1}>
+                  {item.title}
                 </Text>
-              ) : null}
-            </View>
-            <Text style={styles.rowWhen}>{whenLabel(item.lastMessageAt)}</Text>
-          </Pressable>
+                {item.preview ? (
+                  <Text style={styles.rowPreview} numberOfLines={2}>
+                    {mask(item.preview)}
+                  </Text>
+                ) : null}
+              </View>
+              <Text style={styles.rowWhen}>{whenLabel(item.lastMessageAt)}</Text>
+            </Pressable>
+          </ReanimatedSwipeable>
         ))}
       </View>
     </View>
@@ -71,6 +117,8 @@ function Section({ title, items }: { title: string; items: AiConversationListIte
 export default function HistoricoScreen() {
   const { data, isPending, isError, refetch } = useAiConversationsQuery();
   const { data: usage } = useAiUsageQuery();
+  const { mutate: removeConversation } = useDeleteAiConversationMutation();
+  const [toDelete, setToDelete] = useState<AiConversationListItem | null>(null);
 
   if (isPending) {
     return (
@@ -157,11 +205,24 @@ export default function HistoricoScreen() {
           />
         ) : (
           <>
-            <Section title="Esta semana" items={thisWeek} />
-            <Section title="Antes" items={before} />
+            <Section title="Esta semana" items={thisWeek} onDelete={setToDelete} />
+            <Section title="Antes" items={before} onDelete={setToDelete} />
           </>
         )}
       </ScrollView>
+
+      <Dialog
+        visible={toDelete !== null}
+        tone="erro"
+        title="Excluir esta conversa?"
+        text={toDelete ? `"${toDelete.title}" sai do histórico. Não dá pra desfazer.` : ''}
+        confirmLabel="Excluir"
+        onConfirm={() => {
+          if (toDelete) removeConversation(toDelete.id);
+          setToDelete(null);
+        }}
+        onCancel={() => setToDelete(null)}
+      />
     </View>
   );
 }
@@ -233,7 +294,27 @@ const styles = StyleSheet.create({
     borderColor: colors.dark.border.default,
     backgroundColor: colors.dark.bg.surface,
   },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space[12], paddingVertical: space[14] },
+  // Fundo opaco: ao arrastar, a linha desliza por cima do botão "Excluir".
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[12],
+    paddingVertical: space[14],
+    backgroundColor: colors.dark.bg.surface,
+  },
+  deleteAction: {
+    width: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space[4],
+    backgroundColor: colors.dark.icon.error,
+  },
+  deleteLabel: {
+    fontFamily: typography.labelSmall.fontFamily,
+    fontSize: typography.labelSmall.fontSize,
+    lineHeight: typography.labelSmall.lineHeight,
+    color: colors.dark.text.onBrand,
+  },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: colors.dark.border.default },
   rowIcon: {
     width: 36,

@@ -68,6 +68,8 @@ export default function IaScreen() {
   const [conversationId, setConversationId] = useState<string | undefined>(params.conversationId);
   const [messages, setMessages] = useState<AiMessage[]>([]);
   const [draft, setDraft] = useState('');
+  // Altura do campo acompanha o texto (onContentSizeChange), de 1 a 5 linhas.
+  const [inputHeight, setInputHeight] = useState(INPUT_MIN_HEIGHT);
   const [notice, setNotice] = useState<Notice | null>(null);
   const { mutate: send, isPending } = useAiChatMutation();
   // Texto da resposta enquanto ela chega (SSE); vazio = ainda consultando os dados ("digitando").
@@ -329,11 +331,22 @@ export default function IaScreen() {
 
       <Animated.View style={[styles.inputBar, inputBarStyle]}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { height: inputHeight }]}
+          onContentSizeChange={(e) =>
+            setInputHeight(
+              Math.min(
+                INPUT_MAX_HEIGHT,
+                Math.max(INPUT_MIN_HEIGHT, Math.ceil(e.nativeEvent.contentSize.height) + 22),
+              ),
+            )
+          }
           value={draft}
           onChangeText={setDraft}
           placeholder="Pergunte sobre seu dinheiro"
           placeholderTextColor={colors.dark.text.tertiary}
+          // Cresce com o texto (até ~5 linhas, depois rola); Return envia, como num chat.
+          multiline
+          submitBehavior="submit"
           returnKeyType="send"
           onSubmitEditing={() => ask(draft)}
           editable={notice?.kind !== 'quota'}
@@ -360,6 +373,9 @@ export default function IaScreen() {
 
 /** Distância do campo de mensagem até a borda de baixo, acima da tab bar (Figma 33:726). */
 const INPUT_BAR_BOTTOM = 116;
+const INPUT_LINE_HEIGHT = 22;
+const INPUT_MIN_HEIGHT = 44;
+const INPUT_MAX_HEIGHT = INPUT_LINE_HEIGHT * 5 + 22;
 /** Intervalo entre um pedaço e outro do texto na tela ("digitação"). */
 const TYPING_TICK_MS = 33;
 /** Espaço entre o campo e o teclado aberto. */
@@ -485,12 +501,14 @@ const styles = StyleSheet.create({
     bottom: INPUT_BAR_BOTTOM,
     left: 16,
     right: 16,
-    height: 56,
+    minHeight: 56,
     flexDirection: 'row',
-    alignItems: 'center',
+    // Texto de várias linhas: o botão de enviar fica embaixo, à direita.
+    alignItems: 'flex-end',
     gap: space[10],
     paddingLeft: 18,
     paddingRight: space[6],
+    paddingVertical: space[6],
     borderRadius: 28,
     borderWidth: 1,
     borderColor: colors.dark.border.strong,
@@ -500,6 +518,10 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: typography.bodyLarge.fontFamily,
     fontSize: 15,
+    lineHeight: INPUT_LINE_HEIGHT,
+    // Uma linha fica centralizada na altura do botão (44); a partir de 5 linhas, rola.
+    paddingTop: 11,
+    paddingBottom: 11,
     color: colors.dark.text.primary,
   },
   sendButton: {

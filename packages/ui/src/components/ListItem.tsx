@@ -19,7 +19,16 @@ export type ListItemProps = {
   onPress?: () => void;
 };
 
-export function ListItem({ icon, title, value, right, showChevron = true, last = false, danger = false, onPress }: ListItemProps) {
+export function ListItem({
+  icon,
+  title,
+  value,
+  right,
+  showChevron = true,
+  last = false,
+  danger = false,
+  onPress,
+}: ListItemProps) {
   return (
     <Pressable
       onPress={onPress}
@@ -27,11 +36,16 @@ export function ListItem({ icon, title, value, right, showChevron = true, last =
       accessibilityRole="button"
     >
       <View style={[styles.iconBox, danger ? styles.iconBoxDanger : null]}>
-        <Icon name={icon} size={15.3} color={danger ? colors.dark.text.error : colors.dark.text.secondary} />
+        <Icon
+          name={icon}
+          size={15.3}
+          color={danger ? colors.dark.text.error : colors.dark.text.secondary}
+        />
       </View>
       <Text style={[styles.title, danger ? styles.titleDanger : null]}>{title}</Text>
       {value && <Text style={styles.value}>{value}</Text>}
-      {right}
+      {/* Centralizado na linha: o Badge tem `alignSelf: 'flex-start'` (pra não esticar em coluna). */}
+      {right ? <View style={styles.right}>{right}</View> : null}
       {showChevron && <Icon name="seta-direita" size={16} color={colors.dark.text.tertiary} />}
     </Pressable>
   );
@@ -47,6 +61,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.dark.border.default,
   },
+  right: { alignSelf: 'center' },
   rowNoBorder: {
     borderBottomWidth: 0,
   },
