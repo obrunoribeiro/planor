@@ -76,3 +76,20 @@ export function merchantNameForAi(merchantName: string): string | null {
 export function aiMerchantKey(merchantName: string): string {
   return normalizeForMatch(merchantName);
 }
+
+/**
+ * Nome de uma transação pra mandar ao chat da IA (§6.7, "tirar CPF, números de conta e nomes de
+ * terceiros"): o nome sem números, ou um rótulo genérico quando é Pix/transferência pra pessoa ou
+ * nome que parece de pessoa.
+ */
+export function transactionNameForAi(tx: {
+  descriptionRaw: string;
+  merchantName: string | null;
+}): string {
+  const name = tx.merchantName ?? tx.descriptionRaw;
+  const isTransfer = /transfer[eê]ncia|\bpix\b|\bted\b|\bdoc\b/i.test(tx.descriptionRaw);
+  if (looksLikePersonName(name) || (isTransfer && !COMPANY_SUFFIX.test(name.trim()))) {
+    return isTransfer ? 'Transferência para pessoa' : 'Compra com pessoa física';
+  }
+  return merchantNameForAi(name) ?? 'Sem nome';
+}

@@ -7,6 +7,10 @@ import type {
   CategoryListItem,
   ConnectionListItem,
   FutureTimelineResponse,
+  AiChatResponse,
+  AiConversationListItem,
+  AiConversationResponse,
+  AiUsage,
   AlertsResponse,
   CardStatementResponse,
   FixedBillsResponse,
@@ -521,6 +525,52 @@ export function useMarkAlertsReadMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['alerts'] });
       void queryClient.invalidateQueries({ queryKey: ['home'] });
+    },
+  });
+}
+
+export function useAiUsageQuery() {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['ai-usage'],
+    queryFn: () => apiFetch<AiUsage>('/ai/usage', { accessToken: accessToken! }),
+    enabled: !!accessToken,
+  });
+}
+
+export function useAiConversationsQuery() {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['ai-conversations'],
+    queryFn: () =>
+      apiFetch<AiConversationListItem[]>('/ai/conversations', { accessToken: accessToken! }),
+    enabled: !!accessToken,
+  });
+}
+
+export function useAiConversationQuery(id: string | undefined) {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['ai-conversation', id],
+    queryFn: () =>
+      apiFetch<AiConversationResponse>(`/ai/conversations/${id}`, { accessToken: accessToken! }),
+    enabled: !!accessToken && !!id,
+  });
+}
+
+export function useAiChatMutation() {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { conversationId?: string; message: string }) =>
+      apiFetch<AiChatResponse>('/ai/chat', {
+        method: 'POST',
+        accessToken: accessToken!,
+        body: JSON.stringify(input),
+      }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['ai-usage'], data.usage);
+      void queryClient.invalidateQueries({ queryKey: ['ai-conversations'] });
     },
   });
 }

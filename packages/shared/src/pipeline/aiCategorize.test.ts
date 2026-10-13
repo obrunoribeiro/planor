@@ -4,6 +4,7 @@ import {
   isAiEligible,
   looksLikePersonName,
   merchantNameForAi,
+  transactionNameForAi,
 } from './aiCategorize';
 
 describe('isAiEligible', () => {
@@ -101,5 +102,37 @@ describe('merchantNameForAi', () => {
 describe('aiMerchantKey', () => {
   it('ignora maiúsculas e acentos', () => {
     expect(aiMerchantKey('Cacau Show')).toBe(aiMerchantKey('CACAU SHÓW'));
+  });
+});
+
+describe('transactionNameForAi', () => {
+  it('estabelecimento vai sem números; pessoa vira rótulo genérico', () => {
+    expect(transactionNameForAi({ descriptionRaw: 'Ebn *Tiktok', merchantName: 'Tiktok' })).toBe(
+      'Tiktok',
+    );
+    expect(
+      transactionNameForAi({
+        descriptionRaw: 'Ifd*47139681 Gelato Bom',
+        merchantName: 'Ifd*47139681 Gelato Bom',
+      }),
+    ).toBe('Ifd* Gelato Bom');
+    expect(
+      transactionNameForAi({
+        descriptionRaw: 'Transferência enviada pelo Pix|Mercadinho Simone',
+        merchantName: 'Mercadinho Simone',
+      }),
+    ).toBe('Transferência para pessoa');
+    expect(
+      transactionNameForAi({
+        descriptionRaw: 'Arminda Claudete da Silva Ribeiro 1/2',
+        merchantName: 'Arminda Claudete da Silva Ribeiro',
+      }),
+    ).toBe('Compra com pessoa física');
+    expect(
+      transactionNameForAi({
+        descriptionRaw: 'Transferência enviada pelo Pix|TELEFONICA BRASIL S.A.',
+        merchantName: 'Telefonica Brasil S.a.',
+      }),
+    ).toBe('Telefonica Brasil S.a.');
   });
 });

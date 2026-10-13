@@ -800,7 +800,7 @@ PATCH /future/installments/:id (name, categoryId, settledEarly)   # "Editar parc
 PATCH /subscriptions/:id (usage, cancelled, reminder)
 GET/POST/PATCH /goals · POST /goals/:id/contributions
 GET  /alerts · POST /alerts/read { ids? }   # sem ids: marcar todos como lidos
-POST /ai/chat (stream SSE) · GET /ai/conversations
+POST /ai/chat (stream SSE; hoje resposta inteira) · GET /ai/conversations · GET /ai/conversations/:id · GET /ai/usage
 GET/POST /households · invites · /households/:id/dashboard · /settlements
 GET/POST /friends · /feed · /posts/:id/reactions|comments · /challenges · /split-expenses
 GET  /recaps/:month
