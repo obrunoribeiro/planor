@@ -12,7 +12,7 @@ import { aiConversations, aiMessages, aiUsage, users } from '@planor/db';
 import { monthKeySaoPaulo } from '@planor/shared';
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
-import { buildTools, makeFetcher, type CategoryCard } from '../ai/tools';
+import { buildTools, makeFetcher, type ChatCard } from '../ai/tools';
 import { systemPrompt } from '../ai/prompt';
 import { env } from '../env';
 import { requireUserId } from '../lib/auth';
@@ -26,7 +26,7 @@ const HISTORY_MESSAGES = 12;
 const MAX_STEPS = 6;
 const MAX_OUTPUT_TOKENS = 700;
 
-type StoredExtras = { card?: CategoryCard | null; tools?: string[] };
+type StoredExtras = { card?: ChatCard | null; tools?: string[] };
 
 async function usageFor(userId: string, plan: string, month: string) {
   const [row] = await db
@@ -111,8 +111,11 @@ export async function aiRoutes(app: FastifyInstance) {
       { role: 'user', content: body.data.message },
     ];
 
-    let card: CategoryCard | null = null;
+    let card: ChatCard | null = null;
+    // Um cartão por resposta: uma proposta (limite/meta) vale mais que o gráfico de contexto.
     const tools = buildTools(makeFetcher(app, request.headers.authorization!), (c) => {
+      const current = card as ChatCard | null;
+      if (c.type === 'category' && current && current.type !== 'category') return;
       card = c;
     });
 
@@ -142,7 +145,7 @@ export async function aiRoutes(app: FastifyInstance) {
     }
     if (!text) text = 'Não consegui montar uma resposta agora. Tenta perguntar de outro jeito?';
 
-    // O mesmo gráfico da resposta anterior (pergunta de seguimento sobre a mesma categoria) não
+    // O mesmo cartão da resposta anterior (pergunta de seguimento sobre a mesma coisa) não
     // aparece de novo.
     if (card && history.length > 0) {
       const [previous] = await db
@@ -152,13 +155,7 @@ export async function aiRoutes(app: FastifyInstance) {
         .orderBy(desc(aiMessages.createdAt))
         .limit(1);
       const previousCard = (previous?.toolCalls as StoredExtras | null)?.card;
-      const current = card as CategoryCard;
-      if (
-        previousCard &&
-        previousCard.title === current.title &&
-        previousCard.totalCents === current.totalCents
-      )
-        card = null;
+      if (previousCard && JSON.stringify(previousCard) === JSON.stringify(card)) card = null;
     }
 
     await db

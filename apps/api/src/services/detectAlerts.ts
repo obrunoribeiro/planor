@@ -10,6 +10,7 @@ import { and, eq, gte, inArray, isNotNull, lt, lte, or, isNull, sql } from 'driz
 import {
   alerts,
   categories,
+  goals,
   creditCards,
   monthlySummaries,
   recurrences,
@@ -20,6 +21,7 @@ import {
   addMonthsToKey,
   billClosingDateKey,
   categoriesAheadOfPace,
+  categoryLimitStatus,
   lastMonthKeys,
   latestPriceChange,
   monthlyAverageCents,
@@ -271,6 +273,56 @@ async function detectStatementClosing(userId: string, now: Date) {
   return result;
 }
 
+/** Limite de categoria (§6.5): aviso em 80% (se ligado) e estouro, uma vez por mês cada. */
+async function detectCategoryLimits(userId: string, now: Date) {
+  const month = todayKeySaoPaulo(now).slice(0, 7);
+  const [limits, [summary], alerted80, alertedOver] = await Promise.all([
+    db
+      .select({
+        id: goals.id,
+        categoryId: goals.categoryId,
+        targetCents: goals.targetCents,
+        alertAtPct: goals.alertAtPct,
+        startsMonth: goals.startsMonth,
+        categoryName: categories.name,
+      })
+      .from(goals)
+      .innerJoin(categories, eq(categories.id, goals.categoryId))
+      .where(and(eq(goals.ownerId, userId), eq(goals.type, 'category_limit'))),
+    db
+      .select({ byCategory: monthlySummaries.byCategory })
+      .from(monthlySummaries)
+      .where(and(eq(monthlySummaries.userId, userId), eq(monthlySummaries.month, month))),
+    existingKeys(userId, 'limit_80', 'limitKey'),
+    existingKeys(userId, 'limit_exceeded', 'limitKey'),
+  ]);
+  const spent = (summary?.byCategory as Record<string, number> | undefined) ?? {};
+  return limits.flatMap((limit) => {
+    const spentCents = spent[limit.categoryId!] ?? 0;
+    const status = categoryLimitStatus({
+      spentCents,
+      targetCents: limit.targetCents,
+      alertAtPct: limit.alertAtPct,
+      startsMonth: limit.startsMonth,
+      monthKey: month,
+    });
+    const limitKey = `${limit.id}:${month}`;
+    const payload = {
+      limitKey,
+      goalId: limit.id,
+      categoryId: limit.categoryId,
+      categoryName: limit.categoryName,
+      spentCents,
+      targetCents: limit.targetCents,
+    };
+    if (status === 'exceeded' && !alertedOver.has(limitKey))
+      return [{ userId, type: 'limit_exceeded', payload }];
+    if (status === 'warning' && !alerted80.has(limitKey))
+      return [{ userId, type: 'limit_80', payload }];
+    return [];
+  });
+}
+
 export async function detectAlerts(
   userId: string,
   now = new Date(),
@@ -282,6 +334,7 @@ export async function detectAlerts(
       detectCategoryPace(userId, now),
       detectPriceUps(userId, now),
       detectStatementClosing(userId, now),
+      detectCategoryLimits(userId, now),
     ])
   ).flat();
   if (found.length > 0 && !options.dryRun) await db.insert(alerts).values(found);

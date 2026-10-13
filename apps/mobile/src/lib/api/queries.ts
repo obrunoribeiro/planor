@@ -12,6 +12,8 @@ import type {
   AiConversationResponse,
   AiUsage,
   AlertsResponse,
+  GoalDetail,
+  GoalItem,
   CardStatementResponse,
   FixedBillsResponse,
   HomeResponse,
@@ -572,5 +574,95 @@ export function useAiChatMutation() {
       queryClient.setQueryData(['ai-usage'], data.usage);
       void queryClient.invalidateQueries({ queryKey: ['ai-conversations'] });
     },
+  });
+}
+
+export function useGoalsQuery() {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['goals'],
+    queryFn: () => apiFetch<{ items: GoalItem[] }>('/goals', { accessToken: accessToken! }),
+    enabled: !!accessToken,
+  });
+}
+
+export function useGoalQuery(id: string) {
+  const accessToken = useAccessToken();
+  return useQuery({
+    queryKey: ['goal', id],
+    queryFn: () => apiFetch<GoalDetail>(`/goals/${id}`, { accessToken: accessToken! }),
+    enabled: !!accessToken && !!id,
+  });
+}
+
+function invalidateGoals(queryClient: ReturnType<typeof useQueryClient>) {
+  void queryClient.invalidateQueries({ queryKey: ['goals'] });
+  void queryClient.invalidateQueries({ queryKey: ['goal'] });
+}
+
+export type CreateGoalInput =
+  | { type: 'savings'; name: string; targetCents: number; deadline?: string | null }
+  | {
+      type: 'category_limit';
+      categoryId: string;
+      targetCents: number;
+      alertAt80: boolean;
+      startNextMonth: boolean;
+    };
+
+export function useCreateGoalMutation() {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateGoalInput) =>
+      apiFetch<{ id: string }>('/goals', {
+        method: 'POST',
+        accessToken: accessToken!,
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => invalidateGoals(queryClient),
+  });
+}
+
+export function useUpdateGoalMutation(id: string) {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: {
+      name?: string;
+      targetCents?: number;
+      deadline?: string | null;
+      alertAt80?: boolean;
+    }) =>
+      apiFetch<{ id: string }>(`/goals/${id}`, {
+        method: 'PATCH',
+        accessToken: accessToken!,
+        body: JSON.stringify(patch),
+      }),
+    onSuccess: () => invalidateGoals(queryClient),
+  });
+}
+
+export function useDeleteGoalMutation() {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<void>(`/goals/${id}`, { method: 'DELETE', accessToken: accessToken! }),
+    onSuccess: () => invalidateGoals(queryClient),
+  });
+}
+
+export function useAddContributionMutation(goalId: string) {
+  const accessToken = useAccessToken();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { amountCents: number; where: string | null }) =>
+      apiFetch<{ id: string }>(`/goals/${goalId}/contributions`, {
+        method: 'POST',
+        accessToken: accessToken!,
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => invalidateGoals(queryClient),
   });
 }

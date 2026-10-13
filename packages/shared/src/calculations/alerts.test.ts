@@ -135,6 +135,25 @@ describe('describeAlert', () => {
     ).toBe('Fatura do Nubank fecha amanhã');
   });
 
+  it('limite de categoria: perto e estourado levam à categoria', () => {
+    const payload = {
+      categoryId: 'c1',
+      categoryName: 'Delivery',
+      spentCents: 24_000,
+      targetCents: 30_000,
+    };
+    expect(describeAlert('limit_80', payload)).toMatchObject({
+      title: 'Delivery perto do limite',
+      route: '/gastos/categoria/c1',
+    });
+    expect(plain(describeAlert('limit_80', payload).body)).toBe(
+      'Você já gastou R$ 240,00 dos R$ 300,00 do mês.',
+    );
+    expect(describeAlert('limit_exceeded', { ...payload, spentCents: 31_000 }).title).toBe(
+      'Limite de delivery estourado',
+    );
+  });
+
   it('tipo desconhecido não quebra', () => {
     expect(describeAlert('algo_novo', {})).toMatchObject({ title: 'Aviso', route: null });
   });

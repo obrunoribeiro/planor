@@ -423,6 +423,25 @@ protótipo do Figma.
   compras) ficou em Lazer, confirmado pelo Bruno. No primeiro teste, antes do
   `looksLikePersonName`, ~13 nomes de pessoa que vendem na maquininha foram enviados uma vez; as
   respostas deles foram apagadas do cache e não são mais enviados.
+- **Metas e limites de categoria (§6.8, §6.5)** — telas `app/ia/metas.tsx` (Figma 51:1177) e
+  `app/ia/meta/[id].tsx` (51:1249), sheets "Nova meta"/editar (51:1322), "Registrar valor
+  guardado" (51:1295) e "Criar limite" (46:934, com o componente novo `Slider` em `@planor/ui`).
+  Metas abre por um botão novo no topo da Planor IA; "Criar limite"/"Ajustar" fica num card na
+  tela da categoria em Gastos. API: `GET/POST /goals`, `GET/PATCH/DELETE /goals/:id`,
+  `POST /goals/:id/contributions` (eram stub); `goals.starts_month` (migração
+  `0011_ambitious_hardball.sql`, já aplicada) pro "começar no mês que vem". Regras puras em
+  `packages/shared/src/calculations/goals.ts` (com teste): ritmo por mês/semana até o prazo, mês
+  em que completa no ritmo atual, situação do limite, textos dos cards — os números do Figma
+  batem (R$ 4.000 em 12 meses = R$ 333,33; R$ 2.550 em 2 meses = R$ 1.275,00). Alertas novos
+  `limit_80` e `limit_exceeded` (uma vez por mês cada), testados com um limite de teste no Lazer
+  da conta do Bruno e apagados depois.
+- **Planor IA propõe limite e meta (Figma 33:711)** — ferramentas `get_goals`,
+  `propose_category_limit` e `propose_goal`. A IA nunca cria nada: mostra o cartão com "Criar
+  limite/meta" e "Ajustar valor", e quem confirma é o usuário. O valor do limite sai do backend
+  (80% da média mensal, arredondado de R$ 10 em R$ 10, entre R$ 100 e R$ 500); o da meta é o que a
+  pessoa disse (sem valor, a IA pergunta), e o "por mês" do cartão é calculado no app. Testado na
+  conta do Bruno: "gastar menos com mercado" → limite de R$ 130,00 (média R$ 166,88); "juntar 5 mil
+  em 10 meses" → cartão da meta; "começar uma reserva" → perguntou o valor.
 - **Planor IA — chat de verdade (§6.7, Figma 33:556, 33:643, 50:1127)** — a aba IA deixou de ser
   mock: sugestões e campo mandam a pergunta, conversa com balões, "digitando", cartão de dados com
   o gráfico da categoria (33:674) e histórico de conversas (`app/ia/historico.tsx`, com a cota do
@@ -481,11 +500,12 @@ protótipo do Figma.
   cobrança depois do cancelamento só aparece no contador do sino (a central de alertas ainda não
   existe).
 - Passo 6 (fixo/variável pela recorrência).
-- Planor IA: resposta em streaming (SSE), voz (microfone, "Ouvindo" 50:1334), cards de ação
-  ("Criar meta"/"Ajustar valor" — dependem de limites por categoria e metas, §6.5/§6.8),
-  `simulate_purchase` (v2), `create_category_limit`/`create_goal`/`get_goals`, o sheet "Limite de
-  perguntas" com o Pro (51:1359, depende do RevenueCat), classificador de intenção e cache de
-  prompt.
+- Planor IA: resposta em streaming (SSE), voz (microfone, "Ouvindo" 50:1334),
+  `simulate_purchase` (v2), o sheet "Limite de perguntas" com o Pro (51:1359, depende do
+  RevenueCat), "Meta criada" (33:755), classificador de intenção e cache de prompt.
+- Metas: seção "Em grupo" e metas da casa (Fase 5), estado vazio do Figma (82:2118 — hoje usa o
+  `EmptyState` padrão), "Limite criado" (46:972), escolher ícone da meta, item de meta no plano da
+  semana. Metas fictícias do seed ainda na conta do Bruno (4, com 6 depósitos).
 - "Atualizar agora" leva ~1 min na conta do Bruno (1.135 transações): a sincronização grava uma
   transação por vez. Dá pra fazer em lote.
 
@@ -544,6 +564,11 @@ protótipo do Figma.
   ritmo da categoria só vale pra categorias variáveis com média de pelo menos R$ 100 (uma parcela
   de R$ 46 sozinha já passava dos 80%). Os dois tipos usam `unusual_spend`, com `payload.kind`
   `purchase` ou `category`.
+- **Metas liberadas no plano Grátis** — a tabela de planos do CONTEXTO põe "metas e plano personalizados" no Pro, mas
+  sem o RevenueCat não há como assinar; o bloqueio entra junto com a assinatura.
+- **Metas abre pela Planor IA** — o §5 põe `ia/metas` dentro da IA, mas nenhuma tela do Figma
+  tem o caminho até lá (a aba Metas é v2). Ficou um botão com o ícone de meta no topo da IA, ao
+  lado do histórico. O card de limite na categoria usa um texto fixo, não a "dica da IA".
 - **"Importantes" na central** = gasto fora do padrão, assinatura mais cara, cobrança depois do
   cancelamento e problemas de conexão (o CONTEXTO lista o chip, mas não diz quais tipos).
 - **"Editar parcelamento" sem "Avisar antes da última parcela"** — sem push (§6.9) o aviso não

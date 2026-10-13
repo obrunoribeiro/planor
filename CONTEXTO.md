@@ -798,7 +798,7 @@ GET  /future/statements/:accountId?month=YYYY-MM  # fatura do cartão; sem month
 POST /future/bills · DELETE /future/bills/:id   # "Nova conta fixa" cadastrada à mão
 PATCH /future/installments/:id (name, categoryId, settledEarly)   # "Editar parcelamento"
 PATCH /subscriptions/:id (usage, cancelled, reminder)
-GET/POST/PATCH /goals · POST /goals/:id/contributions
+GET/POST /goals · GET/PATCH/DELETE /goals/:id · POST /goals/:id/contributions   # limite de categoria é goal type=category_limit
 GET  /alerts · POST /alerts/read { ids? }   # sem ids: marcar todos como lidos
 POST /ai/chat (stream SSE; hoje resposta inteira) · GET /ai/conversations · GET /ai/conversations/:id · GET /ai/usage
 GET/POST /households · invites · /households/:id/dashboard · /settlements

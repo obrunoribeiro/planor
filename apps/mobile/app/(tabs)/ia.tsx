@@ -58,7 +58,11 @@ function suggestions(): { icon: IconName; text: string }[] {
 type Notice = { kind: 'quota' | 'error'; text: string; retry?: string };
 
 export default function IaScreen() {
-  const params = useLocalSearchParams<{ conversationId?: string; nova?: string }>();
+  const params = useLocalSearchParams<{
+    conversationId?: string;
+    nova?: string;
+    pergunta?: string;
+  }>();
   const { data: me } = useMeQuery();
   const { data: connections } = useConnectionsQuery();
   const [conversationId, setConversationId] = useState<string | undefined>(params.conversationId);
@@ -75,11 +79,13 @@ export default function IaScreen() {
       setConversationId(undefined);
       setMessages([]);
       setNotice(null);
+      // "Montar uma meta com a Planor IA" (Metas): começa a conversa com a pergunta pronta.
+      if (params.pergunta) setDraft(params.pergunta);
     } else if (params.conversationId) {
       setConversationId(params.conversationId);
       setNotice(null);
     }
-  }, [params.conversationId, params.nova]);
+  }, [params.conversationId, params.nova, params.pergunta]);
 
   useEffect(() => {
     if (loaded && loaded.id === conversationId) setMessages(loaded.messages);
@@ -185,6 +191,14 @@ export default function IaScreen() {
             <Text style={styles.statusLabel}>{inConversation ? 'Online' : banksLabel}</Text>
           </View>
         </View>
+        {/* Metas (§6.8): ficam dentro da Planor IA (§5, "ia/metas"); a aba própria é v2. */}
+        <Pressable
+          style={styles.iconButton}
+          onPress={() => router.push('/ia/metas')}
+          accessibilityLabel="Metas"
+        >
+          <Icon name="meta" size={20} color={colors.dark.text.primary} />
+        </Pressable>
         <Pressable
           style={styles.iconButton}
           onPress={() => router.push('/ia/historico')}

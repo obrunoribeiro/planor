@@ -78,6 +78,8 @@ export const KNOWN_ALERT_TYPES = [
   'consent_expiring',
   'sync_failed',
   'bank_disconnected',
+  'limit_80',
+  'limit_exceeded',
 ] as const;
 
 export type AlertTone = 'brand' | 'alert' | 'error' | 'success';
@@ -159,6 +161,24 @@ export function describeAlert(type: string, payload: Payload): AlertView {
         icon: 'futuro',
         route: payload.accountId ? `/futuro/fatura/${str(payload.accountId)}` : '/futuro',
         important: false,
+      };
+    case 'limit_80':
+      return {
+        title: `${str(payload.categoryName, 'Categoria')} perto do limite`,
+        body: `Você já gastou ${formatCents(num(payload.spentCents))} dos ${formatCents(num(payload.targetCents))} do mês.`,
+        tone: 'alert',
+        icon: 'meta',
+        route: payload.categoryId ? `/gastos/categoria/${str(payload.categoryId)}` : null,
+        important: true,
+      };
+    case 'limit_exceeded':
+      return {
+        title: `Limite de ${str(payload.categoryName, 'categoria').toLowerCase()} estourado`,
+        body: `Você gastou ${formatCents(num(payload.spentCents))} este mês, acima do limite de ${formatCents(num(payload.targetCents))}.`,
+        tone: 'error',
+        icon: 'meta',
+        route: payload.categoryId ? `/gastos/categoria/${str(payload.categoryId)}` : null,
+        important: true,
       };
     case 'consent_expiring':
       return {

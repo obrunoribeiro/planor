@@ -1,0 +1,1 @@
+ALTER TABLE "goals" ADD COLUMN "starts_month" text;
