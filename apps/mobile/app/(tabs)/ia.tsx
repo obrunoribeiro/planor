@@ -72,6 +72,31 @@ export default function IaScreen() {
   const { mutate: send, isPending } = useAiChatMutation();
   // Texto da resposta enquanto ela chega (SSE); vazio = ainda consultando os dados ("digitando").
   const [streamingText, setStreamingText] = useState('');
+  // A IA escreve mais rápido do que se lê: o texto recebido entra na tela num ritmo de digitação
+  // (`shownText`). A mensagem final (com o cartão) só entra quando a digitação alcança o fim.
+  const [shownText, setShownText] = useState('');
+  const [finalMessage, setFinalMessage] = useState<AiMessage | null>(null);
+  const typing = isPending || streamingText.length > 0 || finalMessage !== null;
+
+  useEffect(() => {
+    if (shownText.length < streamingText.length) {
+      const backlog = streamingText.length - shownText.length;
+      // ~60 caracteres por segundo; acelera se ficar muito pra trás (resposta longa).
+      const step = Math.max(2, Math.ceil(backlog / 40));
+      const timer = setTimeout(
+        () => setShownText(streamingText.slice(0, shownText.length + step)),
+        TYPING_TICK_MS,
+      );
+      return () => clearTimeout(timer);
+    }
+    if (finalMessage && shownText.length >= streamingText.length) {
+      setMessages((current) => [...current, finalMessage]);
+      setFinalMessage(null);
+      setStreamingText('');
+      setShownText('');
+    }
+    return undefined;
+  }, [shownText, streamingText, finalMessage]);
   const { data: loaded } = useAiConversationQuery(params.conversationId);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -95,7 +120,7 @@ export default function IaScreen() {
 
   const ask = (text: string) => {
     const message = text.trim();
-    if (!message || isPending) return;
+    if (!message || typing) return;
     setDraft('');
     setNotice(null);
     setMessages((current) => [
@@ -109,6 +134,7 @@ export default function IaScreen() {
       },
     ]);
     setStreamingText('');
+    setShownText('');
     send(
       {
         conversationId,
@@ -118,11 +144,13 @@ export default function IaScreen() {
       {
         onSuccess: (data) => {
           setConversationId(data.conversationId);
-          setStreamingText('');
-          setMessages((current) => [...current, data.message]);
+          // O texto salvo é o que vale (se algum pedaço se perdeu no caminho).
+          setStreamingText(data.message.content);
+          setFinalMessage(data.message);
         },
         onError: (error) => {
           setStreamingText('');
+          setShownText('');
           if (error instanceof ApiError && error.status === 402) {
             setNotice({
               kind: 'quota',
@@ -140,10 +168,12 @@ export default function IaScreen() {
     );
   };
 
+  // Desce junto com o texto, de linha em linha (a cada ~40 caracteres).
+  const typedLines = Math.floor(shownText.length / 40);
   useEffect(() => {
     const timer = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
     return () => clearTimeout(timer);
-  }, [messages.length, isPending, notice, streamingText]);
+  }, [messages.length, isPending, notice, typedLines]);
 
   const activeBanks = (connections ?? []).filter((c) => c.status !== 'disconnected').length;
   const banksLabel =
@@ -167,7 +197,7 @@ export default function IaScreen() {
   }, []);
 
   const firstName = me?.name?.split(' ')[0];
-  const inConversation = messages.length > 0 || isPending;
+  const inConversation = messages.length > 0 || typing;
 
   return (
     <View style={styles.screen}>
@@ -263,13 +293,13 @@ export default function IaScreen() {
             {messages.map((message) => (
               <ChatMessage key={message.id} message={message} />
             ))}
-            {isPending &&
-              (streamingText ? (
+            {typing &&
+              (shownText ? (
                 <ChatMessage
                   message={{
                     id: 'streaming',
                     role: 'assistant',
-                    content: streamingText,
+                    content: shownText,
                     card: null,
                     createdAt: new Date().toISOString(),
                   }}
@@ -311,14 +341,14 @@ export default function IaScreen() {
         />
         <Pressable
           onPress={() => ask(draft)}
-          disabled={!draft.trim() || isPending}
+          disabled={!draft.trim() || typing}
           accessibilityLabel="Enviar pergunta"
         >
           <LinearGradient
             colors={gradients.icone.colors}
             start={gradients.icone.start}
             end={gradients.icone.end}
-            style={[styles.sendButton, !draft.trim() || isPending ? styles.sendDisabled : null]}
+            style={[styles.sendButton, !draft.trim() || typing ? styles.sendDisabled : null]}
           >
             <Icon name="enviar" size={18} color={colors.dark.text.primary} />
           </LinearGradient>
@@ -330,6 +360,8 @@ export default function IaScreen() {
 
 /** Distância do campo de mensagem até a borda de baixo, acima da tab bar (Figma 33:726). */
 const INPUT_BAR_BOTTOM = 116;
+/** Intervalo entre um pedaço e outro do texto na tela ("digitação"). */
+const TYPING_TICK_MS = 33;
 /** Espaço entre o campo e o teclado aberto. */
 const KEYBOARD_GAP = 12;
 

@@ -426,7 +426,10 @@ protótipo do Figma.
 - **Planor IA com streaming (SSE)** — `POST /ai/chat?stream=1` manda o texto aos pedaços
   (`delta`) e termina com `done` (mesmo corpo da resposta sem stream). No app, `src/lib/api/aiStream.ts`
   lê com o `fetch` do `expo/fetch` (o do React Native não lê o corpo aos poucos); o balão vai
-  enchendo e o "digitando" aparece só enquanto a IA consulta os dados. Usa o `fullStream` do AI SDK
+  enchendo e o "digitando" aparece só enquanto a IA consulta os dados. Como o modelo escreve mais
+  rápido do que se lê (no teste do Bruno a resposta apareceu "de uma vez"), o texto recebido entra
+  na tela num ritmo de digitação (~60 caracteres/s, acelera em resposta longa) e o cartão só aparece
+  no fim. Usa o `fullStream` do AI SDK
   (o `textStream` engole erro do provedor). O olho também esconde valor pela metade no fim do
   texto ("R$ 1.720,").
 - **Cobrança duplicada de assinatura (§6.3, passo 5)** — alerta novo
