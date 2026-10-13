@@ -356,3 +356,34 @@ export type AlertItem = {
 };
 
 export type AlertsResponse = { unreadCount: number; items: AlertItem[] };
+
+/** Cartão de dados de uma resposta da IA (gráfico da categoria, Figma 33:674). Números da API. */
+export type AiCategoryCard = {
+  type: 'category';
+  title: string;
+  totalCents: number;
+  pctVsAverage: number | null;
+  months: { label: string; amountCents: number; active: boolean }[];
+};
+
+export type AiMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  card: AiCategoryCard | null;
+  createdAt: string;
+};
+
+/** Cota de perguntas do mês (§6.7). `limit` nulo = ilimitado (Pro). */
+export type AiUsage = { used: number; limit: number | null; month: string };
+
+export type AiChatResponse = { conversationId: string; message: AiMessage; usage: AiUsage };
+
+export type AiConversationListItem = {
+  id: string;
+  title: string;
+  preview: string | null;
+  lastMessageAt: string;
+};
+
+export type AiConversationResponse = { id: string; title: string; messages: AiMessage[] };

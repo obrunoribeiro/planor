@@ -26,6 +26,7 @@ export const aiMessages = pgTable('ai_messages', {
   content: text('content').notNull(),
   toolCalls: jsonb('tool_calls'),
   tokens: integer('tokens'),
+  createdAt: createdAt(),
 });
 
 /** Cota mensal — 10 perguntas no Grátis, ilimitado (com limite justo) no Pro (§6.7). */

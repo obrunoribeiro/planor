@@ -423,6 +423,22 @@ protótipo do Figma.
   compras) ficou em Lazer, confirmado pelo Bruno. No primeiro teste, antes do
   `looksLikePersonName`, ~13 nomes de pessoa que vendem na maquininha foram enviados uma vez; as
   respostas deles foram apagadas do cache e não são mais enviados.
+- **Planor IA — chat de verdade (§6.7, Figma 33:556, 33:643, 50:1127)** — a aba IA deixou de ser
+  mock: sugestões e campo mandam a pergunta, conversa com balões, "digitando", cartão de dados com
+  o gráfico da categoria (33:674) e histórico de conversas (`app/ia/historico.tsx`, com a cota do
+  mês no Grátis). API: `POST /ai/chat`, `GET /ai/conversations`, `GET /ai/conversations/:id`,
+  `GET /ai/usage`; `ai_messages.created_at` novo (migração `0010_soft_slipstream.sql`, já
+  aplicada). Sonnet 5.5 (`claude-sonnet-5-5`) com 8 ferramentas em `apps/api/src/ai/tools.ts`
+  (gasto por categoria, detalhe da categoria, busca de transações, assinaturas, parcelas,
+  comprometido, sobra, plano da semana). **A IA nunca faz conta:** cada ferramenta chama a mesma
+  rota que a tela usa (`app.inject`, com o token de quem pergunta) e devolve valores já
+  formatados, totais e percentuais prontos; o prompt (`src/ai/prompt.ts`) proíbe calcular e manda
+  dizer que não sabe. Testado com a conta do Bruno: delivery de setembro (R$ 128,35, igual à
+  tela), recusou calcular média por dia, recusou indicar CDB/Tesouro, TikTok de setembro
+  (R$ 2.321,67 em 43 compras), sobra de outubro, e não revelou quem recebeu Pix. Nomes que vão pro
+  modelo passam por `transactionNameForAi` (packages/shared, com teste): Pix/compra com pessoa
+  vira rótulo genérico. Cota: 10 perguntas/mês no Grátis (`ai_usage`), 402 `quota_exceeded`
+  quando acaba; Pro ilimitado. As conversas de teste foram apagadas da conta do Bruno.
 - **Central de alertas (§6.9, Figma 34:857)** — tela `app/alertas.tsx`, aberta pelo sino da Home
   (que antes não fazia nada): grupos por dia (Hoje, Ontem, data), chips Todos / Não lidos /
   Importantes, "Marcar todos como lidos" no topo; tocar marca como lido e abre o destino. Valores
@@ -464,7 +480,12 @@ protótipo do Figma.
   "Uso pouco" esperam o push (§6.9) — sem ele, "Lembrete criado" seria mentira. O alerta de
   cobrança depois do cancelamento só aparece no contador do sino (a central de alertas ainda não
   existe).
-- Passo 6 (fixo/variável pela recorrência), chat da IA (§6.7).
+- Passo 6 (fixo/variável pela recorrência).
+- Planor IA: resposta em streaming (SSE), voz (microfone, "Ouvindo" 50:1334), cards de ação
+  ("Criar meta"/"Ajustar valor" — dependem de limites por categoria e metas, §6.5/§6.8),
+  `simulate_purchase` (v2), `create_category_limit`/`create_goal`/`get_goals`, o sheet "Limite de
+  perguntas" com o Pro (51:1359, depende do RevenueCat), classificador de intenção e cache de
+  prompt.
 - "Atualizar agora" leva ~1 min na conta do Bruno (1.135 transações): a sincronização grava uma
   transação por vez. Dá pra fazer em lote.
 
@@ -507,6 +528,14 @@ protótipo do Figma.
   aberta). A aberta continua calculada em `credit_cards.current_bill_cents`. O card do Futuro, o
   plano da semana e a tela da fatura mostram "a fatura a pagar": a fechada enquanto falta pagar
   (mesmo atrasada), depois a aberta.
+- **Planor IA, primeira versão diferente do §6.7/§8:** resposta inteira (sem streaming SSE) — o
+  `fetch` do React Native não lê stream sem `expo/fetch`, e dá pra trocar depois sem mudar a tela;
+  um modelo só (Sonnet), sem o classificador de intenção barato (com 8 ferramentas o próprio
+  modelo escolhe bem, e um classificador seria outra chamada por pergunta); sem cache de prompt (o
+  prompt de sistema tem menos que o mínimo de tokens que a Anthropic cacheia). Sugestão "Posso
+  parcelar um celular?" saiu do início (simular compra é v2) e entraram "Quanto vai sobrar este
+  mês?" e "Quanto já está comprometido nos próximos meses?". O microfone não aparece até a voz
+  existir.
 - **Limiares do gasto fora do padrão que o CONTEXTO não define** (§6.3, passo 7): compra só
   vira alerta com pelo menos R$ 30 (R$ 12 numa categoria de média R$ 7 passa de 1,5×, mas é
   ruído); média por compra só vale com 3+ compras na categoria; no máximo um alerta de compra

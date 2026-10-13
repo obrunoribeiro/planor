@@ -140,6 +140,13 @@ export const gradients = {
     start: { x: 0.203, y: 0.097 },
     end: { x: 0.797, y: 0.903 },
   },
+  // "Cartão de dados" da resposta da Planor IA (Figma 33:674). #2B1A86 → #16151A, 150,79°.
+  cartaoDadosIa: {
+    colors: ['#2B1A86', '#16151A'],
+    angle: 150.79,
+    start: { x: 0.256, y: 0.064 },
+    end: { x: 0.744, y: 0.936 },
+  },
 } as const satisfies Record<string, GradientToken>;
 
 export type GradientName = keyof typeof gradients;
