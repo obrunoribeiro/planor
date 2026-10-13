@@ -429,6 +429,8 @@ protótipo do Figma.
   vazava do card) — e o valor da linha passou a obedecer ao olho; "Nova meta"/"Editar meta" ganhou
   prazo "Outro" (mês/ano digitado) e "Sem prazo"; conversas da Planor IA podem ser excluídas
   (arrastar pra esquerda ou segurar, com confirmação) — `DELETE /ai/conversations/:id`.
+  O campo de mensagem da Planor IA cresce com o texto (até 5 linhas, depois rola) em vez de
+  andar pro lado; Return envia.
 - **Planor IA com streaming (SSE)** — `POST /ai/chat?stream=1` manda o texto aos pedaços
   (`delta`) e termina com `done` (mesmo corpo da resposta sem stream). No app, `src/lib/api/aiStream.ts`
   lê com o `fetch` do `expo/fetch` (o do React Native não lê o corpo aos poucos); o balão vai
